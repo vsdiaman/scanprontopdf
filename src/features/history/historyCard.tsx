@@ -18,13 +18,16 @@ function formatDate(ts: number) {
 export function HistoryCard() {
   const { items, isLoading } = useHistory();
   const count = items.length;
+
+  const headerRight = isLoading ? '...' : count === 0 ? '' : String(count);
+
   const visibleItems = items.slice(0, 5);
 
   return (
     <Card>
       <View style={styles.header}>
         <Text style={styles.title}>Recentes</Text>
-        <Text style={styles.count}>{count}</Text>
+        <Text style={styles.right}>{headerRight}</Text>
       </View>
 
       {isLoading ? (
@@ -63,7 +66,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   title: { color: colors.text, fontSize: 14, fontWeight: '900' },
-  count: { color: colors.mutedText, fontSize: 12, fontWeight: '900' },
+  right: { color: colors.mutedText, fontSize: 12, fontWeight: '900' },
 
   desc: {
     color: colors.mutedText,

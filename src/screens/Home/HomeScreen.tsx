@@ -1,9 +1,10 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View, ScrollView } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { RootStackParamList } from '../../navigation/types';
 import { AppHeader } from '../../components/AppHeader';
-// import { PrimaryButton } from '../../components/PrimaryButton';
 import { SecondaryButton } from '../../components/SecondaryButton';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
@@ -12,38 +13,53 @@ import { HistoryCard } from '../../features/history/historyCard';
 type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
 
 export function HomeScreen({ navigation }: Props) {
+  const insets = useSafeAreaInsets();
+
   const startScan = () => navigation.navigate('Scan');
 
   return (
     <View style={styles.container}>
-      <AppHeader title="Scanner Pronto PDF" subtitle="Escaneie em 1 toque" />
+      <View style={[styles.headerWrap, { paddingTop: insets.top }]}>
+        <AppHeader title="Scanner Pronto PDF" subtitle="Escaneie em 1 toque" />
+      </View>
 
-      <View style={styles.content}>
+      <ScrollView
+        contentContainerStyle={[
+          styles.content,
+          { paddingBottom: insets.bottom + spacing.xl },
+        ]}
+        showsVerticalScrollIndicator={false}
+      >
         <View style={styles.heroCard}>
           <Text style={styles.heroTitle}>Scan your first document</Text>
           <Text style={styles.heroDesc}>
             Fluxo simples: capturar → escolher formato → salvar.
           </Text>
+
           <View style={styles.heroActions}>
             <SecondaryButton label="Escanear agora" onPress={startScan} />
-            {/* <SecondaryButton
-              label="Como funciona"
-              onPress={() =>
-                navigation.navigate('OnboardingStep', { stepIndex: 0 })
-              }
-            /> */}
           </View>
         </View>
 
         <HistoryCard />
-      </View>
+      </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
-  content: { flex: 1, paddingHorizontal: spacing.xl, gap: spacing.lg },
+
+  headerWrap: {
+    backgroundColor: colors.background,
+  },
+
+  content: {
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.lg,
+    gap: spacing.lg,
+  },
+
   heroCard: {
     borderRadius: 22,
     padding: spacing.xl,
@@ -57,12 +73,4 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
   },
   heroActions: { marginTop: spacing.lg, gap: spacing.sm },
-
-  sectionTitle: { color: colors.text, fontSize: 14, fontWeight: '900' },
-  sectionDesc: {
-    color: colors.mutedText,
-    fontSize: 12,
-    fontWeight: '700',
-    marginTop: spacing.xs,
-  },
 });
