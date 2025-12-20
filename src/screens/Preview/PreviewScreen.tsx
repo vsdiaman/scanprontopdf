@@ -1,10 +1,10 @@
-// src/screens/Preview/PreviewScreen.tsx
 import React, { useMemo, useState } from 'react';
 import {
   Alert,
   Image,
-  PermissionsAndroid,
+  KeyboardAvoidingView,
   Platform,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -19,13 +19,12 @@ import { PrimaryButton } from '../../components/PrimaryButton';
 import { SegmentedControl } from '../../components/SegmentedControl';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
-
-import { addHistoryItem } from '../../features/history/historyRepository';
 import {
   buildSaveSuccessMessage,
   saveScanAndExport,
   SaveFormat,
 } from '../../services/scanSaveService';
+import { addHistoryItem } from '../../features/history/historyRepository';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Preview'>;
 
@@ -34,58 +33,6 @@ function sanitizeFileName(rawName: string) {
     .trim()
     .replace(/\s+/g, '_')
     .replace(/[^a-zA-Z0-9_-]/g, '');
-}
-
-async function requestAndroidPermission(permission: string) {
-  try {
-    const alreadyGranted = await PermissionsAndroid.check(permission as any);
-    if (alreadyGranted) return true;
-
-    const result = await PermissionsAndroid.request(permission as any);
-    return result === PermissionsAndroid.RESULTS.GRANTED;
-  } catch {
-    return false;
-  }
-}
-
-/**
- * Export:
- * - JPEG -> galeria (CameraRoll)
- * - PDF  -> tenta Downloads (copyFile)
- *
- * Permissões:
- * - Android 13+ (33): imagens = READ_MEDIA_IMAGES
- * - Android 9 e abaixo (<=28): WRITE_EXTERNAL_STORAGE
- * - Android 10-12: geralmente ok (scoped storage), mas alguns devices podem exigir READ
- */
-async function ensureExportPermission(format: SaveFormat) {
-  if (Platform.OS !== 'android') return true;
-
-  const apiLevel = typeof Platform.Version === 'number' ? Platform.Version : 0;
-
-  if (format === 'JPEG') {
-    if (apiLevel >= 33) {
-      return requestAndroidPermission('android.permission.READ_MEDIA_IMAGES');
-    }
-
-    if (apiLevel <= 28) {
-      return requestAndroidPermission(
-        'android.permission.WRITE_EXTERNAL_STORAGE',
-      );
-    }
-
-    // Android 10-12
-    return true;
-  }
-
-  // PDF -> Downloads: Android 9 e abaixo precisa WRITE
-  if (apiLevel <= 28) {
-    return requestAndroidPermission(
-      'android.permission.WRITE_EXTERNAL_STORAGE',
-    );
-  }
-
-  return true;
 }
 
 export function PreviewScreen({ navigation, route }: Props) {
@@ -97,33 +44,26 @@ export function PreviewScreen({ navigation, route }: Props) {
 
   const fileExtension = saveFormat === 'PDF' ? '.pdf' : '.jpg';
 
+  const safeBaseName = useMemo(() => {
+    return sanitizeFileName(fileName) || 'scan';
+  }, [fileName]);
+
+  const finalFileName = useMemo(() => {
+    return `${safeBaseName}${fileExtension}`;
+  }, [safeBaseName, fileExtension]);
+
   const saveLabel = useMemo(() => {
-    const base = fileName.trim() || 'scan';
-    return isSaving ? 'Salvando...' : `Salvar ${base}${fileExtension}`;
-  }, [fileName, fileExtension, isSaving]);
+    return isSaving ? 'Salvando...' : `Salvar ${finalFileName}`;
+  }, [isSaving, finalFileName]);
 
   const onSave = async () => {
     if (isSaving) return;
 
     setIsSaving(true);
-
-    const permissionOk = await ensureExportPermission(saveFormat);
-    if (!permissionOk && Platform.OS === 'android') {
-      Alert.alert(
-        'Permissão',
-        'Permissão negada. Vá em Configurações > Apps > Scanner Pronto PDF > Permissões e permita.',
-      );
-      setIsSaving(false);
-      return;
-    }
-
     try {
-      const safeBaseName = sanitizeFileName(fileName) || `scan_${Date.now()}`;
-      const finalFileName = `${safeBaseName}${fileExtension}`;
-
       const { savedInAppPath, exportedPath } = await saveScanAndExport({
         imageUri,
-        fileName: safeBaseName, // sem extensão (o service coloca)
+        fileName: safeBaseName,
         format: saveFormat,
       });
 
@@ -144,10 +84,7 @@ export function PreviewScreen({ navigation, route }: Props) {
 
       navigation.popToTop();
     } catch (error) {
-      Alert.alert(
-        'Erro',
-        error instanceof Error ? error.message : 'Falha ao salvar.',
-      );
+      Alert.alert(error instanceof Error ? error.message : 'Erro ao salvar.');
     } finally {
       setIsSaving(false);
     }
@@ -161,67 +98,89 @@ export function PreviewScreen({ navigation, route }: Props) {
         onLeftActionPress={() => navigation.goBack()}
       />
 
-      <View style={styles.content}>
-        <Card>
-          <View style={styles.previewBox}>
-            <Image source={{ uri: imageUri }} style={styles.previewImage} />
-          </View>
-        </Card>
-
-        <Card>
-          <Text style={styles.label}>Formato</Text>
-          <SegmentedControl
-            value={saveFormat}
-            options={['PDF', 'JPEG']}
-            onChange={value => setSaveFormat(value as SaveFormat)}
-          />
-
-          <Text style={[styles.label, { marginTop: spacing.lg }]}>
-            Nome do arquivo
-          </Text>
-          <TextInput
-            value={fileName}
-            onChangeText={setFileName}
-            placeholder="Ex: contrato_2025"
-            placeholderTextColor={colors.mutedText}
-            autoCapitalize="none"
-            autoCorrect={false}
-            style={styles.input}
-          />
-
-          <View style={{ marginTop: spacing.lg }}>
-            <PrimaryButton
-              label={saveLabel}
-              onPress={onSave}
-              disabled={isSaving}
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+      >
+        <ScrollView
+          contentContainerStyle={styles.content}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <Card>
+            <Image
+              source={{ uri: imageUri }}
+              style={styles.image}
+              resizeMode="contain"
             />
-          </View>
-        </Card>
+          </Card>
 
-        <Text style={styles.hint}>
-          JPEG: app + galeria. PDF: app + (tenta) Downloads.
-        </Text>
-      </View>
+          <Card>
+            <Text style={styles.label}>Formato</Text>
+            <SegmentedControl
+              value={saveFormat}
+              options={['PDF', 'JPEG']}
+              onChange={value => setSaveFormat(value as SaveFormat)}
+            />
+
+            <Text style={[styles.label, { marginTop: spacing.lg }]}>
+              Nome do arquivo
+            </Text>
+
+            {/* Feedback visual */}
+            <View style={styles.previewNameRow}>
+              <Text style={styles.previewNameLabel}>Vai salvar como:</Text>
+              <Text style={styles.previewNameValue} numberOfLines={1}>
+                {finalFileName}
+              </Text>
+            </View>
+
+            <TextInput
+              value={fileName}
+              onChangeText={setFileName}
+              placeholder="Ex: contrato_2025"
+              placeholderTextColor={colors.mutedText}
+              autoCapitalize="none"
+              autoCorrect={false}
+              style={styles.input}
+              returnKeyType="done"
+            />
+
+            <View style={{ marginTop: spacing.lg }}>
+              <PrimaryButton
+                label={saveLabel}
+                onPress={onSave}
+                disabled={isSaving}
+              />
+            </View>
+
+            <Text style={styles.hint}>
+              Dica: use nomes curtos (sem acentos). PDF/JPEG serão salvos no
+              aparelho.
+            </Text>
+          </Card>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  flex: { flex: 1 },
   container: { flex: 1, backgroundColor: colors.background },
-  content: { flex: 1, paddingHorizontal: spacing.xl, gap: spacing.lg },
 
-  previewBox: {
-    height: 320,
-    borderRadius: 16,
-    backgroundColor: colors.background,
-    borderWidth: 1,
-    borderColor: colors.border,
-    overflow: 'hidden',
+  content: {
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.xl,
+    gap: spacing.lg,
   },
-  previewImage: {
+
+  image: {
     width: '100%',
-    height: '100%',
-    resizeMode: 'contain',
+    height: 260,
+    borderRadius: 16,
     backgroundColor: colors.background,
   },
 
@@ -231,6 +190,28 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     marginBottom: spacing.sm,
   },
+
+  previewNameRow: {
+    marginBottom: spacing.sm,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 14,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  previewNameLabel: {
+    color: colors.mutedText,
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  previewNameValue: {
+    color: colors.text,
+    fontSize: 12,
+    fontWeight: '900',
+    marginTop: 2,
+  },
+
   input: {
     height: 50,
     borderRadius: 16,
@@ -241,5 +222,11 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
     fontWeight: '800',
   },
-  hint: { color: colors.mutedText, fontSize: 12, fontWeight: '700' },
+
+  hint: {
+    color: colors.mutedText,
+    fontSize: 11,
+    fontWeight: '700',
+    marginTop: spacing.md,
+  },
 });
