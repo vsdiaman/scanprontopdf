@@ -19,6 +19,7 @@ import { SegmentedControl } from '../../../components/SegmentedControl';
 import { colors } from '../../../theme/colors';
 import { spacing } from '../../../theme/spacing';
 
+import { addHistoryItem } from '../../../features/history/historyRepository';
 import {
   buildSaveSuccessMessage,
   SaveFormat,
@@ -42,24 +43,39 @@ async function requestAndroidPermission(permission: string) {
 async function ensureExportPermission(format: SaveFormat) {
   if (Platform.OS !== 'android') return true;
 
-  // JPEG -> galeria (Android 13+ usa READ_MEDIA_IMAGES)
+  // JPEG -> galeria
   if (format === 'JPEG') {
-    if (Platform.Version >= 33)
+    if (Platform.Version >= 33) {
+      // Android 13+: leitura de mídia
       return requestAndroidPermission('android.permission.READ_MEDIA_IMAGES');
-    if (Platform.Version <= 28)
+    }
+
+    if (Platform.Version <= 28) {
+      // Android 9 e abaixo
       return requestAndroidPermission(
         'android.permission.WRITE_EXTERNAL_STORAGE',
       );
+    }
+
+    // Android 10-12
     return requestAndroidPermission('android.permission.READ_EXTERNAL_STORAGE');
   }
 
   // PDF -> Downloads (Android 9 e abaixo pode exigir WRITE)
-  if (Platform.Version <= 28)
+  if (Platform.Version <= 28) {
     return requestAndroidPermission(
       'android.permission.WRITE_EXTERNAL_STORAGE',
     );
+  }
 
   return true;
+}
+
+function sanitizeFileName(rawName: string) {
+  return rawName
+    .trim()
+    .replace(/\s+/g, '_')
+    .replace(/[^a-zA-Z0-9_-]/g, '');
 }
 
 export function PreviewScreen({ navigation, route }: Props) {
@@ -92,10 +108,20 @@ export function PreviewScreen({ navigation, route }: Props) {
     }
 
     try {
+      const safeBaseName = sanitizeFileName(fileName) || `scan_${Date.now()}`;
+      const finalFileName = `${safeBaseName}${fileExtension}`;
+
       const { savedInAppPath, exportedPath } = await saveScanAndExport({
         imageUri,
-        fileName,
+        fileName: safeBaseName,
         format: saveFormat,
+      });
+
+      await addHistoryItem({
+        fileName: finalFileName,
+        format: saveFormat,
+        savedInAppPath,
+        exportedPath,
       });
 
       Alert.alert(
@@ -107,8 +133,8 @@ export function PreviewScreen({ navigation, route }: Props) {
       );
 
       navigation.popToTop();
-    } catch {
-      Alert.alert('Erro', 'Falha ao salvar.');
+    } catch (error) {
+      Alert.alert(error instanceof Error ? error.message : 'Erro ao salvar.');
     } finally {
       setIsSaving(false);
     }

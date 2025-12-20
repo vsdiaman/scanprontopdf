@@ -3,11 +3,11 @@ import { StyleSheet, Text, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
 import { AppHeader } from '../../components/AppHeader';
-import { Card } from '../../components/Card';
 // import { PrimaryButton } from '../../components/PrimaryButton';
 import { SecondaryButton } from '../../components/SecondaryButton';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
+import { HistoryCard } from '../../features/history/historyCard';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
 
@@ -35,12 +35,7 @@ export function HomeScreen({ navigation }: Props) {
           </View>
         </View>
 
-        <Card>
-          <Text style={styles.sectionTitle}>Recentes</Text>
-          <Text style={styles.sectionDesc}>
-            Nenhum arquivo ainda. (UI apenas)
-          </Text>
-        </Card>
+        <HistoryCard />
       </View>
     </View>
   );

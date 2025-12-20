@@ -1,3 +1,4 @@
+// src/screens/Preview/PreviewScreen.tsx
 import React, { useMemo, useState } from 'react';
 import {
   Alert,
@@ -10,6 +11,7 @@ import {
   View,
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+
 import { RootStackParamList } from '../../navigation/types';
 import { AppHeader } from '../../components/AppHeader';
 import { Card } from '../../components/Card';
@@ -17,6 +19,8 @@ import { PrimaryButton } from '../../components/PrimaryButton';
 import { SegmentedControl } from '../../components/SegmentedControl';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
+
+import { addHistoryItem } from '../../features/history/historyRepository';
 import {
   buildSaveSuccessMessage,
   saveScanAndExport,
@@ -25,23 +29,63 @@ import {
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Preview'>;
 
-async function ensureLegacyAndroidWritePermission() {
+function sanitizeFileName(rawName: string) {
+  return rawName
+    .trim()
+    .replace(/\s+/g, '_')
+    .replace(/[^a-zA-Z0-9_-]/g, '');
+}
+
+async function requestAndroidPermission(permission: string) {
+  try {
+    const alreadyGranted = await PermissionsAndroid.check(permission as any);
+    if (alreadyGranted) return true;
+
+    const result = await PermissionsAndroid.request(permission as any);
+    return result === PermissionsAndroid.RESULTS.GRANTED;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Export:
+ * - JPEG -> galeria (CameraRoll)
+ * - PDF  -> tenta Downloads (copyFile)
+ *
+ * Permissões:
+ * - Android 13+ (33): imagens = READ_MEDIA_IMAGES
+ * - Android 9 e abaixo (<=28): WRITE_EXTERNAL_STORAGE
+ * - Android 10-12: geralmente ok (scoped storage), mas alguns devices podem exigir READ
+ */
+async function ensureExportPermission(format: SaveFormat) {
   if (Platform.OS !== 'android') return true;
 
   const apiLevel = typeof Platform.Version === 'number' ? Platform.Version : 0;
-  if (apiLevel >= 29) return true; // Android 10+ usa MediaStore
 
-  const result = await PermissionsAndroid.request(
-    PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE,
-    {
-      title: 'Permissão para salvar',
-      message: 'Precisamos de permissão para salvar arquivos no seu telefone.',
-      buttonPositive: 'Permitir',
-      buttonNegative: 'Cancelar',
-    },
-  );
+  if (format === 'JPEG') {
+    if (apiLevel >= 33) {
+      return requestAndroidPermission('android.permission.READ_MEDIA_IMAGES');
+    }
 
-  return result === PermissionsAndroid.RESULTS.GRANTED;
+    if (apiLevel <= 28) {
+      return requestAndroidPermission(
+        'android.permission.WRITE_EXTERNAL_STORAGE',
+      );
+    }
+
+    // Android 10-12
+    return true;
+  }
+
+  // PDF -> Downloads: Android 9 e abaixo precisa WRITE
+  if (apiLevel <= 28) {
+    return requestAndroidPermission(
+      'android.permission.WRITE_EXTERNAL_STORAGE',
+    );
+  }
+
+  return true;
 }
 
 export function PreviewScreen({ navigation, route }: Props) {
@@ -54,31 +98,56 @@ export function PreviewScreen({ navigation, route }: Props) {
   const fileExtension = saveFormat === 'PDF' ? '.pdf' : '.jpg';
 
   const saveLabel = useMemo(() => {
-    const safeName = fileName.trim() || 'scan';
-    return isSaving ? 'Salvando...' : `Salvar ${safeName}${fileExtension}`;
+    const base = fileName.trim() || 'scan';
+    return isSaving ? 'Salvando...' : `Salvar ${base}${fileExtension}`;
   }, [fileName, fileExtension, isSaving]);
 
   const onSave = async () => {
-    const ok = await ensureLegacyAndroidWritePermission();
-    if (!ok) return;
+    if (isSaving) return;
+
+    setIsSaving(true);
+
+    const permissionOk = await ensureExportPermission(saveFormat);
+    if (!permissionOk && Platform.OS === 'android') {
+      Alert.alert(
+        'Permissão',
+        'Permissão negada. Vá em Configurações > Apps > Scanner Pronto PDF > Permissões e permita.',
+      );
+      setIsSaving(false);
+      return;
+    }
 
     try {
-      setIsSaving(true);
+      const safeBaseName = sanitizeFileName(fileName) || `scan_${Date.now()}`;
+      const finalFileName = `${safeBaseName}${fileExtension}`;
 
-      const result = await saveScanAndExport({
+      const { savedInAppPath, exportedPath } = await saveScanAndExport({
         imageUri,
-        fileName,
+        fileName: safeBaseName, // sem extensão (o service coloca)
         format: saveFormat,
+      });
+
+      await addHistoryItem({
+        fileName: finalFileName,
+        format: saveFormat,
+        savedInAppPath,
+        exportedPath,
       });
 
       Alert.alert(
         'Salvo',
-        buildSaveSuccessMessage(saveFormat, result.exportedPath),
+        `${buildSaveSuccessMessage(
+          saveFormat,
+          exportedPath,
+        )}\n\nApp: ${savedInAppPath}`,
       );
 
-      navigation.goBack();
-    } catch (error: any) {
-      Alert.alert('Erro ao salvar', error?.message ?? 'Falha desconhecida');
+      navigation.popToTop();
+    } catch (error) {
+      Alert.alert(
+        'Erro',
+        error instanceof Error ? error.message : 'Falha ao salvar.',
+      );
     } finally {
       setIsSaving(false);
     }
@@ -128,6 +197,10 @@ export function PreviewScreen({ navigation, route }: Props) {
             />
           </View>
         </Card>
+
+        <Text style={styles.hint}>
+          JPEG: app + galeria. PDF: app + (tenta) Downloads.
+        </Text>
       </View>
     </View>
   );
@@ -168,4 +241,5 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
     fontWeight: '800',
   },
+  hint: { color: colors.mutedText, fontSize: 12, fontWeight: '700' },
 });
