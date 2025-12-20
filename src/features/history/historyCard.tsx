@@ -33,7 +33,7 @@ export function HistoryCard() {
 
   const headerRight = useMemo(() => {
     if (isLoading) return '...';
-    if (count === 0) return 'Nenhum documento';
+    if (count === 0) return '';
     return String(count);
   }, [isLoading, count]);
 

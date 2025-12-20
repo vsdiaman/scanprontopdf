@@ -75,13 +75,12 @@ export function SplashScreen({ navigation }: Props) {
           <Image source={APP_ICON} style={styles.icon} />
         </View>
 
-        {/* <View style={styles.badge}>
-          <Text style={styles.badgeText}>Scanner</Text>
-          <Text style={styles.badgeTextBold}>Pronto</Text>
-        </View> */}
-
         <Text style={styles.title}>Scanner Pronto PDF</Text>
-        <Text style={styles.subtitle}>Rápido, simples e direto.</Text>
+        {/* se quiser traduzir o nome do app agora:
+        <Text style={styles.title}>Scanner Ready PDF</Text>
+        */}
+
+        <Text style={styles.subtitle}>Fast, simple, and straightforward.</Text>
       </Animated.View>
     </Animated.View>
   );
@@ -94,40 +93,28 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  content: {
-    alignItems: 'center',
-  },
+  content: { alignItems: 'center' },
 
   iconWrap: {
-    width: 184, // 92 * 2
-    height: 184, // 92 * 2
-    borderRadius: 48, // 24 * 2
+    width: 184,
+    height: 184,
+    borderRadius: 48,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 8, // 18 * 2
+    marginBottom: 8,
   },
   icon: {
-    width: 190, // 64 * 2
-    height: 190, // 64 * 2
-    borderRadius: 32, // 16 * 2
+    width: 190,
+    height: 190,
+    borderRadius: 32,
   },
 
-  badge: {
-    backgroundColor: colors.primary,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 16,
-    flexDirection: 'row',
-    gap: 6,
-    marginBottom: 14,
-  },
-  badgeText: { color: colors.primaryText, fontWeight: '800' },
-  badgeTextBold: { color: colors.primaryText, fontWeight: '900' },
-  title: { color: colors.text, fontSize: 36, fontWeight: '900' }, // 18 * 2
+  title: { color: colors.text, fontSize: 36, fontWeight: '900' },
   subtitle: {
     color: colors.mutedText,
-    fontSize: 26, // 13 * 2
+    fontSize: 26,
     fontWeight: '700',
-    marginTop: 12, // 6 * 2
+    marginTop: 12,
+    textAlign: 'center',
   },
 });

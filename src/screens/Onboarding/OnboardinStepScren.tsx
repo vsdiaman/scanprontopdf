@@ -39,7 +39,7 @@ export function OnboardingStepScreen({ navigation, route }: Props) {
 
       <View style={styles.hero}>
         <View style={styles.heroIcon}>
-          <Text style={styles.heroIconText}>SP</Text>
+          <Text style={styles.heroIconText}>Scan</Text>
         </View>
 
         <Text style={styles.title}>{step.title}</Text>
