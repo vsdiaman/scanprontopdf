@@ -10,7 +10,6 @@ import {
   View,
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { CameraRoll } from '@react-native-camera-roll/camera-roll';
 
 import { RootStackParamList } from '../../../navigation/types';
 import { AppHeader } from '../../../components/AppHeader';
@@ -20,8 +19,13 @@ import { SegmentedControl } from '../../../components/SegmentedControl';
 import { colors } from '../../../theme/colors';
 import { spacing } from '../../../theme/spacing';
 
+import {
+  buildSaveSuccessMessage,
+  SaveFormat,
+  saveScanAndExport,
+} from '../../../services/scanSaveService';
+
 type Props = NativeStackScreenProps<RootStackParamList, 'Preview'>;
-type SaveFormat = 'PDF' | 'JPEG';
 
 async function requestAndroidPermission(permission: string) {
   try {
@@ -35,23 +39,27 @@ async function requestAndroidPermission(permission: string) {
   }
 }
 
-async function ensureGalleryPermissionForSave() {
+async function ensureExportPermission(format: SaveFormat) {
   if (Platform.OS !== 'android') return true;
 
-  // Android 13+ (API 33+)
-  if (Platform.Version >= 33) {
-    return requestAndroidPermission('android.permission.READ_MEDIA_IMAGES');
+  // JPEG -> galeria (Android 13+ usa READ_MEDIA_IMAGES)
+  if (format === 'JPEG') {
+    if (Platform.Version >= 33)
+      return requestAndroidPermission('android.permission.READ_MEDIA_IMAGES');
+    if (Platform.Version <= 28)
+      return requestAndroidPermission(
+        'android.permission.WRITE_EXTERNAL_STORAGE',
+      );
+    return requestAndroidPermission('android.permission.READ_EXTERNAL_STORAGE');
   }
 
-  // Android 9 e abaixo (API <= 28)
-  if (Platform.Version <= 28) {
+  // PDF -> Downloads (Android 9 e abaixo pode exigir WRITE)
+  if (Platform.Version <= 28)
     return requestAndroidPermission(
       'android.permission.WRITE_EXTERNAL_STORAGE',
     );
-  }
 
-  // Android 10-12 (29-32): geralmente não precisa pra salvar, mas alguns aparelhos/lib pedem leitura.
-  return requestAndroidPermission('android.permission.READ_EXTERNAL_STORAGE');
+  return true;
 }
 
 export function PreviewScreen({ navigation, route }: Props) {
@@ -59,41 +67,50 @@ export function PreviewScreen({ navigation, route }: Props) {
 
   const [saveFormat, setSaveFormat] = useState<SaveFormat>('JPEG');
   const [fileName, setFileName] = useState('scan_001');
+  const [isSaving, setIsSaving] = useState(false);
 
   const fileExtension = saveFormat === 'PDF' ? '.pdf' : '.jpg';
 
   const saveLabel = useMemo(() => {
     const safeName = fileName.trim() || 'scan';
-    return `Salvar ${safeName}${fileExtension}`;
-  }, [fileName, fileExtension]);
+    return isSaving ? 'Salvando...' : `Salvar ${safeName}${fileExtension}`;
+  }, [fileName, fileExtension, isSaving]);
 
   const onSave = async () => {
-    if (saveFormat === 'PDF') {
+    if (isSaving) return;
+
+    setIsSaving(true);
+
+    const permissionOk = await ensureExportPermission(saveFormat);
+    if (!permissionOk && Platform.OS === 'android') {
       Alert.alert(
-        'Ainda não',
-        'PDF você salva em “Arquivos/Downloads”. Galeria é JPEG.',
+        'Permissão',
+        'Permissão negada para exportar. Vá em Permissões do app e permita.',
       );
+      setIsSaving(false);
       return;
     }
 
-    const permissionOk = await ensureGalleryPermissionForSave();
-
     try {
-      // Mesmo se permissionOk for false, tenta salvar; em alguns Androids funciona sem.
-      await CameraRoll.save(imageUri, {
-        type: 'photo',
-        album: 'Scanner Pronto PDF',
+      const { savedInAppPath, exportedPath } = await saveScanAndExport({
+        imageUri,
+        fileName,
+        format: saveFormat,
       });
 
-      Alert.alert('Salvo', 'Imagem salva na galeria.');
+      Alert.alert(
+        'Salvo',
+        `${buildSaveSuccessMessage(
+          saveFormat,
+          exportedPath,
+        )}\n\nApp: ${savedInAppPath}`,
+      );
+
       navigation.popToTop();
     } catch {
-      Alert.alert(
-        'Erro ao salvar',
-        permissionOk
-          ? 'Falha ao salvar na galeria.'
-          : 'Permissão da galeria negada. Vá em Configurações > Apps > Scanner Pronto PDF > Permissões e permita Fotos/Mídia.',
-      );
+      Alert.alert('Erro', 'Falha ao salvar.');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -136,12 +153,16 @@ export function PreviewScreen({ navigation, route }: Props) {
           />
 
           <View style={{ marginTop: spacing.lg }}>
-            <PrimaryButton label={saveLabel} onPress={onSave} />
+            <PrimaryButton
+              label={saveLabel}
+              onPress={onSave}
+              disabled={isSaving}
+            />
           </View>
         </Card>
 
         <Text style={styles.hint}>
-          JPEG salva na Galeria. PDF vamos gerar e salvar em Downloads depois.
+          JPEG: app + galeria. PDF: app + (tenta) Downloads.
         </Text>
       </View>
     </View>

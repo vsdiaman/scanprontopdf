@@ -4,7 +4,7 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
 import { AppHeader } from '../../components/AppHeader';
 import { Card } from '../../components/Card';
-import { PrimaryButton } from '../../components/PrimaryButton';
+// import { PrimaryButton } from '../../components/PrimaryButton';
 import { SecondaryButton } from '../../components/SecondaryButton';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
@@ -25,13 +25,13 @@ export function HomeScreen({ navigation }: Props) {
             Fluxo simples: capturar → escolher formato → salvar.
           </Text>
           <View style={styles.heroActions}>
-            <PrimaryButton label="Escanear agora" onPress={startScan} />
-            <SecondaryButton
+            <SecondaryButton label="Escanear agora" onPress={startScan} />
+            {/* <SecondaryButton
               label="Como funciona"
               onPress={() =>
                 navigation.navigate('OnboardingStep', { stepIndex: 0 })
               }
-            />
+            /> */}
           </View>
         </View>
 

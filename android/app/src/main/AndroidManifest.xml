@@ -11,6 +11,12 @@
 
     <!-- Android 9 e abaixo (API <= 28) -->
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
+    <uses-permission android:name="android.permission.CAMERA" />
+
+    <!-- Só pra Android 9 ou menor -->
+    <uses-permission
+      android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+      android:maxSdkVersion="28" />
 
 
     <application

@@ -1,5 +1,14 @@
 import React, { useMemo, useState } from 'react';
-import { Alert, StyleSheet, Text, TextInput, View } from 'react-native';
+import {
+  Alert,
+  Image,
+  PermissionsAndroid,
+  Platform,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
 import { AppHeader } from '../../components/AppHeader';
@@ -8,25 +17,71 @@ import { PrimaryButton } from '../../components/PrimaryButton';
 import { SegmentedControl } from '../../components/SegmentedControl';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
+import {
+  buildSaveSuccessMessage,
+  saveScanAndExport,
+  SaveFormat,
+} from '../../services/scanSaveService';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Preview'>;
 
-type SaveFormat = 'PDF' | 'JPEG';
+async function ensureLegacyAndroidWritePermission() {
+  if (Platform.OS !== 'android') return true;
 
-export function PreviewScreen({ navigation }: Props) {
+  const apiLevel = typeof Platform.Version === 'number' ? Platform.Version : 0;
+  if (apiLevel >= 29) return true; // Android 10+ usa MediaStore
+
+  const result = await PermissionsAndroid.request(
+    PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE,
+    {
+      title: 'Permissão para salvar',
+      message: 'Precisamos de permissão para salvar arquivos no seu telefone.',
+      buttonPositive: 'Permitir',
+      buttonNegative: 'Cancelar',
+    },
+  );
+
+  return result === PermissionsAndroid.RESULTS.GRANTED;
+}
+
+export function PreviewScreen({ navigation, route }: Props) {
+  const { imageUri } = route.params;
+
   const [saveFormat, setSaveFormat] = useState<SaveFormat>('PDF');
   const [fileName, setFileName] = useState('scan_001');
+  const [isSaving, setIsSaving] = useState(false);
 
   const fileExtension = saveFormat === 'PDF' ? '.pdf' : '.jpg';
 
   const saveLabel = useMemo(() => {
     const safeName = fileName.trim() || 'scan';
-    return `Salvar ${safeName}${fileExtension}`;
-  }, [fileName, fileExtension]);
+    return isSaving ? 'Salvando...' : `Salvar ${safeName}${fileExtension}`;
+  }, [fileName, fileExtension, isSaving]);
 
-  const onSave = () => {
-    Alert.alert('Salvo', 'Aqui você liga a lógica real depois (PDF/JPEG).');
-    navigation.goBack();
+  const onSave = async () => {
+    const ok = await ensureLegacyAndroidWritePermission();
+    if (!ok) return;
+
+    try {
+      setIsSaving(true);
+
+      const result = await saveScanAndExport({
+        imageUri,
+        fileName,
+        format: saveFormat,
+      });
+
+      Alert.alert(
+        'Salvo',
+        buildSaveSuccessMessage(saveFormat, result.exportedPath),
+      );
+
+      navigation.goBack();
+    } catch (error: any) {
+      Alert.alert('Erro ao salvar', error?.message ?? 'Falha desconhecida');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -40,10 +95,7 @@ export function PreviewScreen({ navigation }: Props) {
       <View style={styles.content}>
         <Card>
           <View style={styles.previewBox}>
-            <Text style={styles.previewTitle}>Preview da imagem</Text>
-            <Text style={styles.previewDesc}>
-              Placeholder (depois entra a foto do scan)
-            </Text>
+            <Image source={{ uri: imageUri }} style={styles.previewImage} />
           </View>
         </Card>
 
@@ -69,14 +121,13 @@ export function PreviewScreen({ navigation }: Props) {
           />
 
           <View style={{ marginTop: spacing.lg }}>
-            <PrimaryButton label={saveLabel} onPress={onSave} />
+            <PrimaryButton
+              label={saveLabel}
+              onPress={onSave}
+              disabled={isSaving}
+            />
           </View>
         </Card>
-
-        <Text style={styles.hint}>
-          Depois: capturar câmera, crop, compressão, gerar PDF,
-          salvar/compartilhar.
-        </Text>
       </View>
     </View>
   );
@@ -87,22 +138,18 @@ const styles = StyleSheet.create({
   content: { flex: 1, paddingHorizontal: spacing.xl, gap: spacing.lg },
 
   previewBox: {
-    height: 220,
+    height: 320,
     borderRadius: 16,
     backgroundColor: colors.background,
     borderWidth: 1,
     borderColor: colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: spacing.lg,
+    overflow: 'hidden',
   },
-  previewTitle: { color: colors.text, fontSize: 14, fontWeight: '900' },
-  previewDesc: {
-    color: colors.mutedText,
-    fontSize: 12,
-    fontWeight: '700',
-    marginTop: spacing.xs,
-    textAlign: 'center',
+  previewImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'contain',
+    backgroundColor: colors.background,
   },
 
   label: {
@@ -121,5 +168,4 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
     fontWeight: '800',
   },
-  hint: { color: colors.mutedText, fontSize: 12, fontWeight: '700' },
 });
