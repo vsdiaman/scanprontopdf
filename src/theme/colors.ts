@@ -46,4 +46,6 @@ export const colors = {
   slate700: '#334155',
   slate800: '#1F2937',
   slate900: '#0F172A',
+
+  danger: '#EF4444',
 } as const;

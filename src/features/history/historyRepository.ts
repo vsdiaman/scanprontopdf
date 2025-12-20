@@ -1,37 +1,37 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { AddHistoryInput, HistoryItem } from './historyTypes';
+import { HistoryItem } from './historyTypes';
 
-const STORAGE_KEY = 'scanner_pronto_pdf.history.v1';
+const HISTORY_KEY = '@scanprontopdf_history_v1';
 
 export async function listHistory(): Promise<HistoryItem[]> {
-  const raw = await AsyncStorage.getItem(STORAGE_KEY);
+  const raw = await AsyncStorage.getItem(HISTORY_KEY);
   if (!raw) return [];
-
   try {
-    const data = JSON.parse(raw) as HistoryItem[];
-    return Array.isArray(data) ? data : [];
+    const items = JSON.parse(raw) as HistoryItem[];
+    return Array.isArray(items) ? items : [];
   } catch {
     return [];
   }
 }
 
 export async function addHistoryItem(
-  input: AddHistoryInput,
-): Promise<HistoryItem> {
+  item: Omit<HistoryItem, 'id' | 'createdAt'>,
+) {
   const current = await listHistory();
 
-  const item: HistoryItem = {
-    id: `${Date.now()}_${Math.random().toString(16).slice(2)}`,
+  const newItem: HistoryItem = {
+    id: String(Date.now()),
     createdAt: Date.now(),
-    ...input,
+    ...item,
   };
 
-  const next = [item, ...current].slice(0, 50); // limita
-  await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-
-  return item;
+  const next = [newItem, ...current];
+  await AsyncStorage.setItem(HISTORY_KEY, JSON.stringify(next));
+  return newItem;
 }
 
-export async function clearHistory() {
-  await AsyncStorage.removeItem(STORAGE_KEY);
+export async function deleteHistoryItem(id: string) {
+  const current = await listHistory();
+  const next = current.filter(item => item.id !== id);
+  await AsyncStorage.setItem(HISTORY_KEY, JSON.stringify(next));
 }

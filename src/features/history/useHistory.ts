@@ -1,13 +1,12 @@
-import { useCallback, useState } from 'react';
-import { useFocusEffect } from '@react-navigation/native';
-import { listHistory } from './historyRepository';
+import { useCallback, useEffect, useState } from 'react';
 import { HistoryItem } from './historyTypes';
+import { deleteHistoryItem, listHistory } from './historyRepository';
 
 export function useHistory() {
   const [items, setItems] = useState<HistoryItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  const reload = useCallback(async () => {
+  const refresh = useCallback(async () => {
     setIsLoading(true);
     try {
       const data = await listHistory();
@@ -17,11 +16,17 @@ export function useHistory() {
     }
   }, []);
 
-  useFocusEffect(
-    useCallback(() => {
-      reload();
-    }, [reload]),
+  const remove = useCallback(
+    async (id: string) => {
+      await deleteHistoryItem(id);
+      await refresh();
+    },
+    [refresh],
   );
 
-  return { items, isLoading, reload };
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
+
+  return { items, isLoading, refresh, remove };
 }
