@@ -1,4 +1,4 @@
-package com.scanprontopdf
+package br.com.huolong.scanprontopdf
 
 import com.facebook.react.ReactActivity
 import com.facebook.react.ReactActivityDelegate

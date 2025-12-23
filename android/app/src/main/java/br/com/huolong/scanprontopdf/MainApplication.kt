@@ -1,4 +1,4 @@
-package com.scanprontopdf
+package br.com.huolong.scanprontopdf
 
 import android.app.Application
 import com.facebook.react.PackageList
