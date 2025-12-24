@@ -2,8 +2,9 @@ export const colors = {
   background: '#FFFFFF',
   text: '#0B1220',
   mutedText: '#667085',
-
+  card: '#DDE3FF',
   primary: '#2563EB',
+  back: '#6f7eeeff',
   primaryText: '#FFFFFF',
 
   surface: '#F6F8FC',

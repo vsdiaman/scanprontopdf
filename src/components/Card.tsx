@@ -11,8 +11,9 @@ const styles = StyleSheet.create({
   container: {
     borderRadius: 18,
     backgroundColor: colors.surface,
-    borderWidth: 1,
+    borderWidth: 2,
     borderColor: colors.border,
     padding: spacing.lg,
+    borderStyle: 'dashed',
   },
 });

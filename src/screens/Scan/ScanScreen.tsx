@@ -140,9 +140,10 @@ const styles = StyleSheet.create({
   card: {
     borderRadius: 22,
     backgroundColor: colors.surface,
-    borderWidth: 1,
+    borderWidth: 2,
     borderColor: colors.border,
     padding: spacing.xl,
+    borderStyle: 'dashed',
   },
 
   title: { color: colors.text, fontSize: 18, fontWeight: '900' },

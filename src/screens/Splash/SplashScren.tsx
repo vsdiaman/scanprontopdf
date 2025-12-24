@@ -75,12 +75,12 @@ export function SplashScreen({ navigation }: Props) {
           <Image source={APP_ICON} style={styles.icon} />
         </View>
 
-        <Text style={styles.title}>Scanner Pronto PDF</Text>
+        {/* <Text style={styles.title}>Scanner Pronto PDF</Text> */}
         {/* se quiser traduzir o nome do app agora:
         <Text style={styles.title}>Scanner Ready PDF</Text>
         */}
 
-        <Text style={styles.subtitle}>Fast, simple, and straightforward.</Text>
+        {/* <Text style={styles.subtitle}>Fast, simple, and straightforward.</Text> */}
       </Animated.View>
     </Animated.View>
   );
@@ -89,7 +89,7 @@ export function SplashScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.sky50,
+    backgroundColor: colors.back,
     alignItems: 'center',
     justifyContent: 'center',
   },

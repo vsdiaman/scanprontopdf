@@ -20,7 +20,10 @@ export function HomeScreen({ navigation }: Props) {
   return (
     <View style={styles.container}>
       <View style={[styles.headerWrap, { paddingTop: insets.top }]}>
-        <AppHeader title="Scanner Pronto PDF" subtitle="Escaneie em 1 toque" />
+        <AppHeader
+          title="Scanner Pronto PDF"
+          subtitle="Escaneie em 1 toque 😊"
+        />
       </View>
 
       <ScrollView
@@ -31,7 +34,7 @@ export function HomeScreen({ navigation }: Props) {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.heroCard}>
-          <Text style={styles.heroTitle}>Scan your first document</Text>
+          <Text style={styles.heroTitle}>Scaneie seu documento</Text>
           <Text style={styles.heroDesc}>
             Fluxo simples: capturar → escolher formato → salvar.
           </Text>
@@ -63,7 +66,7 @@ const styles = StyleSheet.create({
   heroCard: {
     borderRadius: 22,
     padding: spacing.xl,
-    backgroundColor: colors.primary,
+    backgroundColor: colors.back,
   },
   heroTitle: { color: colors.primaryText, fontSize: 20, fontWeight: '900' },
   heroDesc: {
