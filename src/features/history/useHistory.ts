@@ -30,8 +30,8 @@ export function useHistory() {
   );
 
   const exportToDevice = useCallback(
-    async (item: HistoryItem) => {
-      const result = await exportHistoryItemToDevice(item);
+    async (item: HistoryItem, exportBaseName?: string) => {
+      const result = await exportHistoryItemToDevice(item, { exportBaseName });
 
       if (result.exportedPath) {
         await updateHistoryItem(item.id, { exportedPath: result.exportedPath });

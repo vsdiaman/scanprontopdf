@@ -6,6 +6,10 @@ import { HistoryItem } from './historyTypes';
 
 const GALLERY_ALBUM = 'Scanner Pronto PDF';
 
+function stripFileScheme(path: string) {
+  return path.startsWith('file://') ? path.replace('file://', '') : path;
+}
+
 function withFileScheme(path: string) {
   return path.startsWith('file://') ? path : `file://${path}`;
 }
@@ -14,11 +18,21 @@ function stripExt(fileName: string) {
   return fileName.replace(/\.(pdf|jpe?g)$/i, '');
 }
 
-function sanitizeFileName(rawName: string) {
-  return rawName
+function sanitizeBaseName(value: string) {
+  return value
     .trim()
-    .replace(/\s+/g, '_')
-    .replace(/[^a-zA-Z0-9_-]/g, '');
+    .replace(/[\\/:*?"<>|]/g, '-')
+    .replace(/\s+/g, ' ')
+    .slice(0, 60);
+}
+
+function ensureExtension(baseOrName: string, ext: '.pdf' | '.jpg') {
+  const name = baseOrName.trim();
+  if (!name) return '';
+  if (name.toLowerCase().endsWith(ext)) return name;
+  // se vier com outra extensão, remove e aplica a correta
+  const base = stripExt(name);
+  return `${base}${ext}`;
 }
 
 async function ensureLegacyWritePermission() {
@@ -34,49 +48,45 @@ async function ensureLegacyWritePermission() {
   return granted === PermissionsAndroid.RESULTS.GRANTED;
 }
 
-async function exportJpegToGallery(appJpegPath: string) {
-  const allowed = await ensureLegacyWritePermission();
-  if (!allowed) throw new Error('Permissão negada para salvar na galeria.');
-
-  return CameraRoll.save(withFileScheme(appJpegPath), {
-    type: 'photo',
-    album: GALLERY_ALBUM,
-  });
-}
-
-async function exportPdfToDownloads(appPdfPath: string, fileName: string) {
-  if (Platform.OS !== 'android') return undefined;
-
-  const allowed = await ensureLegacyWritePermission();
-  if (!allowed) throw new Error('Permissão negada para salvar em Downloads.');
-
-  const apiLevel = typeof Platform.Version === 'number' ? Platform.Version : 0;
-
-  const baseName = sanitizeFileName(stripExt(fileName)) || `scan_${Date.now()}`;
-  const displayName = fileName.toLowerCase().endsWith('.pdf')
-    ? fileName
-    : `${baseName}.pdf`;
-
-  // Android 10+ (API 29+) -> MediaStore (sem permissão ampla)
-  if (apiLevel >= 29) {
-    const mediaCollection = (ReactNativeBlobUtil as any)?.MediaCollection;
-
-    if (mediaCollection?.copyToMediaStore) {
-      const contentUri = await mediaCollection.copyToMediaStore(
-        {
-          name: displayName,
-          parentFolder: 'ScannerProntoPDF',
-          mimeType: 'application/pdf',
-        },
-        'Download',
-        appPdfPath,
-      );
-
-      return contentUri as string; // content://...
-    }
+async function exportImageAndroid29Plus(appPath: string, displayName: string) {
+  const mediaCollection = (ReactNativeBlobUtil as any)?.MediaCollection;
+  if (!mediaCollection?.copyToMediaStore) {
+    throw new Error('MediaStore indisponível neste aparelho.');
   }
 
-  // Android 9 ou menor -> copia pro /Download (precisa permissão legacy)
+  const contentUri = await mediaCollection.copyToMediaStore(
+    {
+      name: displayName,
+      parentFolder: 'ScannerProntoPDF',
+      mimeType: 'image/jpeg',
+    },
+    'Image',
+    stripFileScheme(appPath),
+  );
+
+  return contentUri as string; // content://...
+}
+
+async function exportPdfAndroid29Plus(appPath: string, displayName: string) {
+  const mediaCollection = (ReactNativeBlobUtil as any)?.MediaCollection;
+  if (!mediaCollection?.copyToMediaStore) {
+    throw new Error('MediaStore indisponível neste aparelho.');
+  }
+
+  const contentUri = await mediaCollection.copyToMediaStore(
+    {
+      name: displayName,
+      parentFolder: 'ScannerProntoPDF',
+      mimeType: 'application/pdf',
+    },
+    'Download',
+    stripFileScheme(appPath),
+  );
+
+  return contentUri as string; // content://...
+}
+
+async function exportPdfLegacy(appPath: string, displayName: string) {
   const downloadsDir = RNFS.DownloadDirectoryPath;
   if (!downloadsDir) return undefined;
 
@@ -85,28 +95,73 @@ async function exportPdfToDownloads(appPdfPath: string, fileName: string) {
   const exists = await RNFS.exists(exportedPath);
   if (exists) await RNFS.unlink(exportedPath);
 
-  await RNFS.copyFile(appPdfPath, exportedPath);
+  await RNFS.copyFile(stripFileScheme(appPath), exportedPath);
   return exportedPath;
 }
 
-export async function exportHistoryItemToDevice(item: HistoryItem) {
-  const exists = await RNFS.exists(item.savedInAppPath);
+type ExportOptions = {
+  exportBaseName?: string; // sem extensão (ex: "meu_doc_2025")
+};
+
+export async function exportHistoryItemToDevice(
+  item: HistoryItem,
+  options?: ExportOptions,
+) {
+  const exists = await RNFS.exists(stripFileScheme(item.savedInAppPath));
   if (!exists) {
     throw new Error('Arquivo não existe mais no app (foi apagado).');
   }
 
+  const apiLevel = typeof Platform.Version === 'number' ? Platform.Version : 0;
+
+  const baseFromHistory = stripExt(item.fileName);
+  const baseName = sanitizeBaseName(options?.exportBaseName ?? baseFromHistory);
+
   if (item.format === 'JPEG') {
-    const exportedPath = await exportJpegToGallery(item.savedInAppPath);
+    const displayName = ensureExtension(baseName || baseFromHistory, '.jpg');
+    if (!displayName) throw new Error('Nome inválido.');
+
+    if (Platform.OS === 'android' && apiLevel >= 29) {
+      const exportedPath = await exportImageAndroid29Plus(
+        item.savedInAppPath,
+        displayName,
+      );
+      return { exportedPath, message: 'JPEG exportado para a Galeria.' };
+    }
+
+    // fallback (nome pode não ficar exatamente como você quer em aparelhos antigos)
+    const allowed = await ensureLegacyWritePermission();
+    if (!allowed) throw new Error('Permissão negada para salvar na galeria.');
+
+    const exportedPath = await CameraRoll.save(
+      withFileScheme(item.savedInAppPath),
+      {
+        type: 'photo',
+        album: GALLERY_ALBUM,
+      },
+    );
+
     return { exportedPath, message: 'JPEG exportado para a Galeria.' };
   }
 
-  const exportedPath = await exportPdfToDownloads(
-    item.savedInAppPath,
-    item.fileName,
-  );
-  if (exportedPath) {
+  // PDF
+  const displayName = ensureExtension(baseName || baseFromHistory, '.pdf');
+  if (!displayName) throw new Error('Nome inválido.');
+
+  if (Platform.OS === 'android' && apiLevel >= 29) {
+    const exportedPath = await exportPdfAndroid29Plus(
+      item.savedInAppPath,
+      displayName,
+    );
     return { exportedPath, message: 'PDF exportado para Downloads.' };
   }
+
+  const allowed = await ensureLegacyWritePermission();
+  if (!allowed) throw new Error('Permissão negada para salvar em Downloads.');
+
+  const exportedPath = await exportPdfLegacy(item.savedInAppPath, displayName);
+  if (exportedPath)
+    return { exportedPath, message: 'PDF exportado para Downloads.' };
 
   return {
     exportedPath: undefined,

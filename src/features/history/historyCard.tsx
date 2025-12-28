@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -9,13 +9,15 @@ import {
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Card } from '../../components/Card';
 import { ConfirmDeleteModal } from '../../components/ConfirmDeleteModal';
+import { RenameFileModal } from '../../components/RenameFileModal'; // ajuste o path
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { useHistory } from './useHistory';
-
+import { HistoryItem } from './historyTypes';
+const TIP_KEY = '@scanprontopdf_tip_rename_export_seen_v1';
 function formatDate(ts: number) {
   const d = new Date(ts);
   const dd = String(d.getDate()).padStart(2, '0');
@@ -25,12 +27,33 @@ function formatDate(ts: number) {
   return `${dd}/${mm} ${hh}:${min}`;
 }
 
+function stripExt(fileName: string) {
+  return fileName.replace(/\.(pdf|jpe?g)$/i, '');
+}
+
 export function HistoryCard() {
   const { items, isLoading, remove, refresh, exportToDevice } = useHistory();
 
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [exportingId, setExportingId] = useState<string | null>(null);
 
+  const [renameItem, setRenameItem] = useState<HistoryItem | null>(null);
+  useEffect(() => {
+    if (isLoading) return;
+    if (items.length === 0) return;
+
+    (async () => {
+      const seen = await AsyncStorage.getItem(TIP_KEY);
+      if (seen) return;
+
+      Alert.alert(
+        'Dica',
+        'Segure no ícone de download para renomear antes de exportar.',
+      );
+
+      await AsyncStorage.setItem(TIP_KEY, '1');
+    })();
+  }, [isLoading, items.length]);
   useFocusEffect(
     useCallback(() => {
       refresh();
@@ -62,13 +85,10 @@ export function HistoryCard() {
     await remove(id);
   };
 
-  const onExport = async (id: string) => {
-    const item = items.find(i => i.id === id);
-    if (!item) return;
-
+  const doExport = async (item: HistoryItem, exportBaseName?: string) => {
     try {
-      setExportingId(id);
-      const { message } = await exportToDevice(item);
+      setExportingId(item.id);
+      const { message } = await exportToDevice(item, exportBaseName);
       Alert.alert('Pronto', message);
     } catch (error: any) {
       Alert.alert('Erro', error?.message || 'Falha ao exportar.');
@@ -108,7 +128,9 @@ export function HistoryCard() {
                   </View>
 
                   <Pressable
-                    onPress={() => onExport(item.id)}
+                    onPress={() => doExport(item)}
+                    onLongPress={() => setRenameItem(item)}
+                    delayLongPress={250}
                     hitSlop={10}
                     style={styles.actionButton}
                     disabled={exportingId === item.id}
@@ -136,7 +158,24 @@ export function HistoryCard() {
             ))}
           </View>
         )}
+        {!isLoading && count > 0 && (
+          <Text style={styles.hint}>
+            **Segure o ícone de download para renomear antes de exportar.
+          </Text>
+        )}
       </Card>
+
+      <RenameFileModal
+        visible={!!renameItem}
+        initialValue={renameItem ? stripExt(renameItem.fileName) : ''}
+        onCancel={() => setRenameItem(null)}
+        onConfirm={async newTitle => {
+          if (!renameItem) return;
+          const item = renameItem;
+          setRenameItem(null);
+          await doExport(item, newTitle);
+        }}
+      />
 
       <ConfirmDeleteModal
         visible={!!pendingDeleteId}
@@ -211,5 +250,11 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  hint: {
+    color: colors.mutedText,
+    fontSize: 11,
+    fontWeight: '700',
+    marginTop: spacing.sm,
   },
 });
