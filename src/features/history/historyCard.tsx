@@ -1,7 +1,8 @@
+// src/features/history/HistoryCard.tsx
+
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
   StyleSheet,
   Text,
@@ -10,14 +11,19 @@ import {
 import { useFocusEffect } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+
 import { Card } from '../../components/Card';
 import { ConfirmDeleteModal } from '../../components/ConfirmDeleteModal';
-import { RenameFileModal } from '../../components/RenameFileModal'; // ajuste o path
+import { RenameFileModal } from '../../components/RenameFileModal';
+import { InfoModal } from '../../components/InfoModal';
+import { Toast } from '../../components/Toast';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { useHistory } from './useHistory';
 import { HistoryItem } from './historyTypes';
+
 const TIP_KEY = '@scanprontopdf_tip_rename_export_seen_v1';
+
 function formatDate(ts: number) {
   const d = new Date(ts);
   const dd = String(d.getDate()).padStart(2, '0');
@@ -34,10 +40,21 @@ function stripExt(fileName: string) {
 export function HistoryCard() {
   const { items, isLoading, remove, refresh, exportToDevice } = useHistory();
 
+  const [isTipVisible, setIsTipVisible] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [exportingId, setExportingId] = useState<string | null>(null);
-
   const [renameItem, setRenameItem] = useState<HistoryItem | null>(null);
+
+  const [toastMessage, setToastMessage] = useState('');
+  const [toastType, setToastType] = useState<'success' | 'error'>('success');
+  const [isToastVisible, setIsToastVisible] = useState(false);
+
+  const showToast = (message: string, type: 'success' | 'error') => {
+    setToastMessage(message);
+    setToastType(type);
+    setIsToastVisible(true);
+  };
+
   useEffect(() => {
     if (isLoading) return;
     if (items.length === 0) return;
@@ -45,15 +62,10 @@ export function HistoryCard() {
     (async () => {
       const seen = await AsyncStorage.getItem(TIP_KEY);
       if (seen) return;
-
-      Alert.alert(
-        'Dica',
-        'Segure no ícone de download para renomear antes de exportar.',
-      );
-
-      await AsyncStorage.setItem(TIP_KEY, '1');
+      setIsTipVisible(true);
     })();
   }, [isLoading, items.length]);
+
   useFocusEffect(
     useCallback(() => {
       refresh();
@@ -89,9 +101,9 @@ export function HistoryCard() {
     try {
       setExportingId(item.id);
       const { message } = await exportToDevice(item, exportBaseName);
-      Alert.alert('Pronto', message);
+      showToast(message, 'success');
     } catch (error: any) {
-      Alert.alert('Erro', error?.message || 'Falha ao exportar.');
+      showToast(error?.message || 'Falha ao exportar.', 'error');
     } finally {
       setExportingId(null);
     }
@@ -110,60 +122,69 @@ export function HistoryCard() {
         ) : count === 0 ? (
           <Text style={styles.desc}>Nenhum arquivo ainda.</Text>
         ) : (
-          <View style={styles.list}>
-            {visibleItems.map(item => (
-              <View key={item.id} style={styles.row}>
-                <View style={styles.left}>
-                  <Text style={styles.fileName} numberOfLines={1}>
-                    {item.fileName}
-                  </Text>
-                  <Text style={styles.meta}>
-                    {item.format} • {formatDate(item.createdAt)}
-                  </Text>
-                </View>
-
-                <View style={styles.rightActions}>
-                  <View style={styles.badge}>
-                    <Text style={styles.badgeText}>{item.format}</Text>
+          <>
+            <View style={styles.list}>
+              {visibleItems.map(item => (
+                <View key={item.id} style={styles.row}>
+                  <View style={styles.left}>
+                    <Text style={styles.fileName} numberOfLines={1}>
+                      {item.fileName}
+                    </Text>
+                    <Text style={styles.meta}>
+                      {item.format} • {formatDate(item.createdAt)}
+                    </Text>
                   </View>
 
-                  <Pressable
-                    onPress={() => doExport(item)}
-                    onLongPress={() => setRenameItem(item)}
-                    delayLongPress={250}
-                    hitSlop={10}
-                    style={styles.actionButton}
-                    disabled={exportingId === item.id}
-                  >
-                    {exportingId === item.id ? (
-                      <ActivityIndicator />
-                    ) : (
-                      <Icon
-                        name="file-download"
-                        size={18}
-                        color={colors.text}
-                      />
-                    )}
-                  </Pressable>
+                  <View style={styles.rightActions}>
+                    <View style={styles.badge}>
+                      <Text style={styles.badgeText}>{item.format}</Text>
+                    </View>
 
-                  <Pressable
-                    onPress={() => onAskDelete(item.id)}
-                    hitSlop={10}
-                    style={styles.actionButton}
-                  >
-                    <Icon name="delete" size={18} color={colors.danger} />
-                  </Pressable>
+                    <Pressable
+                      onPress={() => doExport(item)}
+                      onLongPress={() => setRenameItem(item)}
+                      delayLongPress={250}
+                      hitSlop={10}
+                      style={styles.actionButton}
+                      disabled={exportingId === item.id}
+                    >
+                      {exportingId === item.id ? (
+                        <ActivityIndicator />
+                      ) : (
+                        <Icon
+                          name="file-download"
+                          size={18}
+                          color={colors.text}
+                        />
+                      )}
+                    </Pressable>
+
+                    <Pressable
+                      onPress={() => onAskDelete(item.id)}
+                      hitSlop={10}
+                      style={styles.actionButton}
+                    >
+                      <Icon name="delete" size={18} color={colors.danger} />
+                    </Pressable>
+                  </View>
                 </View>
-              </View>
-            ))}
-          </View>
-        )}
-        {!isLoading && count > 0 && (
-          <Text style={styles.hint}>
-            **Segure o ícone de download para renomear antes de exportar.
-          </Text>
+              ))}
+            </View>
+
+            <Text style={styles.hint}>Segure o download para renomear</Text>
+          </>
         )}
       </Card>
+
+      <InfoModal
+        visible={isTipVisible}
+        title="Dica"
+        message="Segure no ícone de download para renomear antes de exportar."
+        onConfirm={async () => {
+          setIsTipVisible(false);
+          await AsyncStorage.setItem(TIP_KEY, '1');
+        }}
+      />
 
       <RenameFileModal
         visible={!!renameItem}
@@ -187,6 +208,13 @@ export function HistoryCard() {
         }
         onCancel={onCancelDelete}
         onConfirm={onConfirmDelete}
+      />
+
+      <Toast
+        visible={isToastVisible}
+        message={toastMessage}
+        type={toastType}
+        onHide={() => setIsToastVisible(false)}
       />
     </>
   );
@@ -251,6 +279,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+
   hint: {
     color: colors.mutedText,
     fontSize: 11,

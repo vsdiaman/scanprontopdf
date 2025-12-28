@@ -1,6 +1,5 @@
 import React, { useMemo, useState } from 'react';
 import {
-  Alert,
   Image,
   KeyboardAvoidingView,
   Platform,
@@ -17,6 +16,7 @@ import { AppHeader } from '../../components/AppHeader';
 import { Card } from '../../components/Card';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { SegmentedControl } from '../../components/SegmentedControl';
+import { InfoModal } from '../../components/InfoModal';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import {
@@ -42,6 +42,11 @@ export function PreviewScreen({ navigation, route }: Props) {
   const [fileName, setFileName] = useState('scan_001');
   const [isSaving, setIsSaving] = useState(false);
 
+  const [isModalVisible, setIsModalVisible] = useState(false);
+  const [modalTitle, setModalTitle] = useState('');
+  const [modalMessage, setModalMessage] = useState('');
+  const [shouldGoHomeAfterOk, setShouldGoHomeAfterOk] = useState(false);
+
   const fileExtension = saveFormat === 'PDF' ? '.pdf' : '.jpg';
 
   const safeBaseName = useMemo(() => {
@@ -55,6 +60,17 @@ export function PreviewScreen({ navigation, route }: Props) {
   const saveLabel = useMemo(() => {
     return isSaving ? 'Salvando...' : `Salvar ${finalFileName}`;
   }, [isSaving, finalFileName]);
+
+  const openModal = (
+    title: string,
+    message: string,
+    goHomeAfterOk: boolean,
+  ) => {
+    setModalTitle(title);
+    setModalMessage(message);
+    setShouldGoHomeAfterOk(goHomeAfterOk);
+    setIsModalVisible(true);
+  };
 
   const onSave = async () => {
     if (isSaving) return;
@@ -74,14 +90,13 @@ export function PreviewScreen({ navigation, route }: Props) {
         exportedPath,
       });
 
-      Alert.alert(
+      openModal(
         'Salvo',
-        `${buildSaveSuccessMessage(saveFormat, exportedPath)}`,
+        buildSaveSuccessMessage(saveFormat, exportedPath),
+        true,
       );
-
-      navigation.popToTop();
-    } catch (error) {
-      Alert.alert(error instanceof Error ? error.message : 'Erro ao salvar.');
+    } catch (error: any) {
+      openModal('Erro', error?.message || 'Erro ao salvar.', false);
     } finally {
       setIsSaving(false);
     }
@@ -125,7 +140,6 @@ export function PreviewScreen({ navigation, route }: Props) {
               Nome do arquivo
             </Text>
 
-            {/* Feedback visual */}
             <View style={styles.previewNameRow}>
               <Text style={styles.previewNameLabel}>Vai salvar como:</Text>
               <Text style={styles.previewNameValue} numberOfLines={1}>
@@ -159,6 +173,17 @@ export function PreviewScreen({ navigation, route }: Props) {
           </Card>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <InfoModal
+        visible={isModalVisible}
+        title={modalTitle}
+        message={modalMessage}
+        confirmText="OK"
+        onConfirm={() => {
+          setIsModalVisible(false);
+          if (shouldGoHomeAfterOk) navigation.popToTop();
+        }}
+      />
     </View>
   );
 }
