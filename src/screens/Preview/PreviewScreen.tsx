@@ -76,10 +76,7 @@ export function PreviewScreen({ navigation, route }: Props) {
 
       Alert.alert(
         'Salvo',
-        `${buildSaveSuccessMessage(
-          saveFormat,
-          exportedPath,
-        )}\n\nApp: ${savedInAppPath}`,
+        `${buildSaveSuccessMessage(saveFormat, exportedPath)}`,
       );
 
       navigation.popToTop();

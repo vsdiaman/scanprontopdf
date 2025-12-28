@@ -1,13 +1,20 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
+import Icon from 'react-native-vector-icons/MaterialIcons';
 
 import { Card } from '../../components/Card';
 import { ConfirmDeleteModal } from '../../components/ConfirmDeleteModal';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { useHistory } from './useHistory';
-import Icon from 'react-native-vector-icons/MaterialIcons';
 
 function formatDate(ts: number) {
   const d = new Date(ts);
@@ -19,10 +26,11 @@ function formatDate(ts: number) {
 }
 
 export function HistoryCard() {
-  const { items, isLoading, remove, refresh } = useHistory();
-  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const { items, isLoading, remove, refresh, exportToDevice } = useHistory();
 
-  // >>> isso aqui resolve: sempre que voltar pra Home, atualiza a lista
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [exportingId, setExportingId] = useState<string | null>(null);
+
   useFocusEffect(
     useCallback(() => {
       refresh();
@@ -37,14 +45,14 @@ export function HistoryCard() {
     return String(count);
   }, [isLoading, count]);
 
-  const visibleItems = items.slice(0, 5);
+  const visibleItems = useMemo(() => items.slice(0, 5), [items]);
 
-  const pendingItem = pendingDeleteId
-    ? items.find(i => i.id === pendingDeleteId)
-    : undefined;
+  const pendingItem = useMemo(() => {
+    if (!pendingDeleteId) return undefined;
+    return items.find(i => i.id === pendingDeleteId);
+  }, [pendingDeleteId, items]);
 
   const onAskDelete = (id: string) => setPendingDeleteId(id);
-
   const onCancelDelete = () => setPendingDeleteId(null);
 
   const onConfirmDelete = async () => {
@@ -52,6 +60,21 @@ export function HistoryCard() {
     const id = pendingDeleteId;
     setPendingDeleteId(null);
     await remove(id);
+  };
+
+  const onExport = async (id: string) => {
+    const item = items.find(i => i.id === id);
+    if (!item) return;
+
+    try {
+      setExportingId(id);
+      const { message } = await exportToDevice(item);
+      Alert.alert('Pronto', message);
+    } catch (error: any) {
+      Alert.alert('Erro', error?.message || 'Falha ao exportar.');
+    } finally {
+      setExportingId(null);
+    }
   };
 
   return (
@@ -85,9 +108,26 @@ export function HistoryCard() {
                   </View>
 
                   <Pressable
+                    onPress={() => onExport(item.id)}
+                    hitSlop={10}
+                    style={styles.actionButton}
+                    disabled={exportingId === item.id}
+                  >
+                    {exportingId === item.id ? (
+                      <ActivityIndicator />
+                    ) : (
+                      <Icon
+                        name="file-download"
+                        size={18}
+                        color={colors.text}
+                      />
+                    )}
+                  </Pressable>
+
+                  <Pressable
                     onPress={() => onAskDelete(item.id)}
                     hitSlop={10}
-                    style={styles.deleteButton}
+                    style={styles.actionButton}
                   >
                     <Icon name="delete" size={18} color={colors.danger} />
                   </Pressable>
@@ -162,7 +202,7 @@ const styles = StyleSheet.create({
   },
   badgeText: { color: colors.text, fontSize: 11, fontWeight: '900' },
 
-  deleteButton: {
+  actionButton: {
     width: 34,
     height: 34,
     borderRadius: 10,

@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import { HistoryItem } from './historyTypes';
-import { deleteHistoryItem, listHistory } from './historyRepository';
+import {
+  deleteHistoryItem,
+  listHistory,
+  updateHistoryItem,
+} from './historyRepository';
+import { exportHistoryItemToDevice } from './exportHistoryItem';
 
 export function useHistory() {
   const [items, setItems] = useState<HistoryItem[]>([]);
@@ -24,9 +29,23 @@ export function useHistory() {
     [refresh],
   );
 
+  const exportToDevice = useCallback(
+    async (item: HistoryItem) => {
+      const result = await exportHistoryItemToDevice(item);
+
+      if (result.exportedPath) {
+        await updateHistoryItem(item.id, { exportedPath: result.exportedPath });
+        await refresh();
+      }
+
+      return result;
+    },
+    [refresh],
+  );
+
   useEffect(() => {
     refresh();
   }, [refresh]);
 
-  return { items, isLoading, refresh, remove };
+  return { items, isLoading, refresh, remove, exportToDevice };
 }

@@ -35,3 +35,17 @@ export async function deleteHistoryItem(id: string) {
   const next = current.filter(item => item.id !== id);
   await AsyncStorage.setItem(HISTORY_KEY, JSON.stringify(next));
 }
+
+export async function updateHistoryItem(
+  id: string,
+  patch: Partial<Omit<HistoryItem, 'id' | 'createdAt'>>,
+) {
+  const current = await listHistory();
+
+  const next = current.map(item => {
+    if (item.id !== id) return item;
+    return { ...item, ...patch };
+  });
+
+  await AsyncStorage.setItem(HISTORY_KEY, JSON.stringify(next));
+}
