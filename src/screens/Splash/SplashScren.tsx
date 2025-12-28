@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { Animated, Easing, Image, StyleSheet, Text, View } from 'react-native';
+import { Animated, Easing, Image, StyleSheet, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
 import { colors } from '../../theme/colors';
@@ -89,24 +89,26 @@ export function SplashScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.back,
+    backgroundColor: colors.background,
     alignItems: 'center',
     justifyContent: 'center',
   },
   content: { alignItems: 'center' },
 
   iconWrap: {
-    width: 184,
-    height: 184,
+    width: 280,
+    height: 280,
     borderRadius: 48,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 8,
+    backgroundColor: colors.background, // ou uma cor do logo
+    overflow: 'hidden',
   },
   icon: {
-    width: 190,
-    height: 190,
-    borderRadius: 32,
+    width: 250,
+    height: 250,
+    resizeMode: 'contain',
   },
 
   title: { color: colors.text, fontSize: 36, fontWeight: '900' },
