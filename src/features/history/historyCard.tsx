@@ -95,7 +95,7 @@ export function HistoryCard() {
   const headerRight = useMemo(() => {
     if (isLoading) return '...';
     if (count === 0) return '';
-    return String(count);
+    return `${count} salvos`;
   }, [isLoading, count]);
 
   const visibleItems = useMemo(() => {
