@@ -19,6 +19,10 @@ import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { useHistory } from './useHistory';
 import { HistoryItem } from './historyTypes';
+import {
+  loadInterstitial,
+  showInterstitialIfReady,
+} from '../../ads/interstitial';
 
 const TIP_KEY = '@scanprontopdf_tip_rename_export_seen_v1';
 
@@ -59,6 +63,9 @@ export function HistoryCard() {
   const [mergeSnapshot, setMergeSnapshot] = useState<HistoryItem[]>([]);
   const [isMergeNamingVisible, setIsMergeNamingVisible] = useState(false);
   const [isMerging, setIsMerging] = useState(false);
+  useEffect(() => {
+    loadInterstitial();
+  }, []);
 
   const showToast = (message: string, type: 'success' | 'error') => {
     setToastMessage(message);
@@ -164,6 +171,9 @@ export function HistoryCard() {
   const doMerge = async (baseName: string) => {
     try {
       setIsMerging(true);
+
+      await showInterstitialIfReady();
+
       const { message } = await mergePdfsAndExport(mergeSnapshot, baseName);
       showToast(message, 'success');
       exitSelectMode();

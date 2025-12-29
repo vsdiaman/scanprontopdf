@@ -1,4 +1,5 @@
-import React, { useCallback } from 'react';
+// src/screens/Scan/ScanScreen.tsx
+import React, { useCallback, useEffect } from 'react';
 import {
   Alert,
   PermissionsAndroid,
@@ -21,6 +22,10 @@ import { PrimaryButton } from '../../components/PrimaryButton';
 import { BannerBottom } from '../../components/BannerBottom';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
+import {
+  loadInterstitial,
+  showInterstitialIfReady,
+} from '../../ads/interstitial';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Scan'>;
 
@@ -47,9 +52,15 @@ async function ensureCameraPermission() {
 export function ScanScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
 
+  useEffect(() => {
+    loadInterstitial();
+  }, []);
+
   const startScan = useCallback(async () => {
     const allowed = await ensureCameraPermission();
     if (!allowed) return;
+
+    await showInterstitialIfReady();
 
     try {
       const { scannedImages, status } = await DocumentScanner.scanDocument({
