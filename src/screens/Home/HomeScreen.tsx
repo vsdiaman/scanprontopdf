@@ -9,12 +9,14 @@ import { SecondaryButton } from '../../components/SecondaryButton';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { HistoryCard } from '../../features/history/historyCard';
+import { BannerBottom } from '../../components/BannerBottom';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
 
+const BANNER_HEIGHT = 60; // bom o bastante pra ANCHORED/BANNER em muitos devices
+
 export function HomeScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
-
   const startScan = () => navigation.navigate('Scan');
 
   return (
@@ -29,7 +31,7 @@ export function HomeScreen({ navigation }: Props) {
       <ScrollView
         contentContainerStyle={[
           styles.content,
-          { paddingBottom: insets.bottom + spacing.xl },
+          { paddingBottom: insets.bottom + spacing.xl + BANNER_HEIGHT },
         ]}
         showsVerticalScrollIndicator={false}
       >
@@ -46,6 +48,10 @@ export function HomeScreen({ navigation }: Props) {
 
         <HistoryCard />
       </ScrollView>
+
+      <View style={[styles.bannerWrap, { paddingBottom: insets.bottom }]}>
+        <BannerBottom />
+      </View>
     </View>
   );
 }
@@ -53,14 +59,18 @@ export function HomeScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
 
-  headerWrap: {
-    backgroundColor: colors.background,
-  },
+  headerWrap: { backgroundColor: colors.background },
 
   content: {
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.lg,
     gap: spacing.lg,
+  },
+
+  bannerWrap: {
+    alignItems: 'center',
+    backgroundColor: colors.background,
+    paddingTop: spacing.sm,
   },
 
   heroCard: {

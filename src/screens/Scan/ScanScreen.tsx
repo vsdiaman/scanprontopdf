@@ -1,4 +1,3 @@
-// src/screens/Scan/ScanScreen.tsx
 import React, { useCallback } from 'react';
 import {
   Alert,
@@ -10,16 +9,22 @@ import {
   View,
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from 'react-native-safe-area-context';
 import DocumentScanner from 'react-native-document-scanner-plugin';
 
 import { RootStackParamList } from '../../navigation/types';
 import { AppHeader } from '../../components/AppHeader';
 import { PrimaryButton } from '../../components/PrimaryButton';
+import { BannerBottom } from '../../components/BannerBottom';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Scan'>;
+
+const BANNER_HEIGHT = 60;
 
 function normalizeUri(path: string) {
   if (path.startsWith('file://') || path.startsWith('content://')) return path;
@@ -40,6 +45,8 @@ async function ensureCameraPermission() {
 }
 
 export function ScanScreen({ navigation }: Props) {
+  const insets = useSafeAreaInsets();
+
   const startScan = useCallback(async () => {
     const allowed = await ensureCameraPermission();
     if (!allowed) return;
@@ -71,7 +78,10 @@ export function ScanScreen({ navigation }: Props) {
 
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[
+          styles.content,
+          { paddingBottom: spacing.xl + BANNER_HEIGHT + insets.bottom },
+        ]}
       >
         <View style={styles.card}>
           <Text style={styles.title}>Pronto para escanear</Text>
@@ -121,6 +131,10 @@ export function ScanScreen({ navigation }: Props) {
           </View>
         </View>
       </ScrollView>
+
+      <View style={[styles.bannerWrap, { paddingBottom: insets.bottom }]}>
+        <BannerBottom />
+      </View>
     </SafeAreaView>
   );
 }
@@ -128,13 +142,17 @@ export function ScanScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
 
-  // card mais pra cima (não centraliza no meio)
   content: {
     flexGrow: 1,
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.lg,
-    paddingBottom: spacing.xl,
     justifyContent: 'flex-start',
+  },
+
+  bannerWrap: {
+    alignItems: 'center',
+    backgroundColor: colors.background,
+    paddingTop: spacing.sm,
   },
 
   card: {

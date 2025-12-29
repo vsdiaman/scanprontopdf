@@ -1,4 +1,7 @@
 {
   "name": "ScanProntoPDF",
-  "displayName": "ScanProntoPDF"
+  "displayName": "ScanProntoPDF",
+  "react-native-google-mobile-ads": {
+    "android_app_id": "ca-app-pub-7046874699264482~1467863360"
+  }
 }
