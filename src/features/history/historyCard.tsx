@@ -1,5 +1,3 @@
-// src/features/history/HistoryCard.tsx
-
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -38,7 +36,14 @@ function stripExt(fileName: string) {
 }
 
 export function HistoryCard() {
-  const { items, isLoading, remove, refresh, exportToDevice } = useHistory();
+  const {
+    items,
+    isLoading,
+    remove,
+    refresh,
+    exportToDevice,
+    mergePdfsAndExport,
+  } = useHistory();
 
   const [isTipVisible, setIsTipVisible] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
@@ -48,6 +53,12 @@ export function HistoryCard() {
   const [toastMessage, setToastMessage] = useState('');
   const [toastType, setToastType] = useState<'success' | 'error'>('success');
   const [isToastVisible, setIsToastVisible] = useState(false);
+
+  const [isSelectMode, setIsSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [mergeSnapshot, setMergeSnapshot] = useState<HistoryItem[]>([]);
+  const [isMergeNamingVisible, setIsMergeNamingVisible] = useState(false);
+  const [isMerging, setIsMerging] = useState(false);
 
   const showToast = (message: string, type: 'success' | 'error') => {
     setToastMessage(message);
@@ -80,12 +91,47 @@ export function HistoryCard() {
     return String(count);
   }, [isLoading, count]);
 
-  const visibleItems = useMemo(() => items.slice(0, 5), [items]);
+  const visibleItems = useMemo(() => {
+    if (isSelectMode) return items; // em seleção, mostra tudo
+    return items.slice(0, 5);
+  }, [items, isSelectMode]);
 
   const pendingItem = useMemo(() => {
     if (!pendingDeleteId) return undefined;
     return items.find(i => i.id === pendingDeleteId);
   }, [pendingDeleteId, items]);
+
+  const selectedItems = useMemo(() => {
+    if (!selectedIds.length) return [];
+    const set = new Set(selectedIds);
+    return items.filter(i => set.has(i.id));
+  }, [items, selectedIds]);
+
+  const hasNonPdfSelected = useMemo(
+    () => selectedItems.some(i => i.format !== 'PDF'),
+    [selectedItems],
+  );
+
+  const canMerge = useMemo(() => {
+    if (!isSelectMode) return false;
+    if (isMerging) return false;
+    if (selectedItems.length < 2) return false;
+    if (hasNonPdfSelected) return false;
+    return true;
+  }, [isSelectMode, isMerging, selectedItems.length, hasNonPdfSelected]);
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      if (prev.includes(id)) return prev.filter(x => x !== id);
+      return [...prev, id];
+    });
+  };
+
+  const exitSelectMode = () => {
+    setIsSelectMode(false);
+    setSelectedIds([]);
+    setMergeSnapshot([]);
+  };
 
   const onAskDelete = (id: string) => setPendingDeleteId(id);
   const onCancelDelete = () => setPendingDeleteId(null);
@@ -109,12 +155,52 @@ export function HistoryCard() {
     }
   };
 
+  const onAskMerge = () => {
+    if (!selectedItems.length) return;
+    setMergeSnapshot(selectedItems);
+    setIsMergeNamingVisible(true);
+  };
+
+  const doMerge = async (baseName: string) => {
+    try {
+      setIsMerging(true);
+      const { message } = await mergePdfsAndExport(mergeSnapshot, baseName);
+      showToast(message, 'success');
+      exitSelectMode();
+    } catch (error: any) {
+      showToast(error?.message || 'Falha ao juntar PDFs.', 'error');
+    } finally {
+      setIsMerging(false);
+    }
+  };
+
+  const headerActionLabel = useMemo(() => {
+    if (isLoading) return '';
+    if (count === 0) return '';
+    return isSelectMode ? 'Cancelar' : 'Selecionar';
+  }, [isLoading, count, isSelectMode]);
+
   return (
     <>
       <Card>
         <View style={styles.header}>
           <Text style={styles.title}>Recentes</Text>
-          <Text style={styles.right}>{headerRight}</Text>
+
+          <View style={styles.headerRight}>
+            <Text style={styles.right}>{headerRight}</Text>
+
+            {!!headerActionLabel && (
+              <Pressable
+                onPress={() =>
+                  isSelectMode ? exitSelectMode() : setIsSelectMode(true)
+                }
+                hitSlop={10}
+                style={styles.headerButton}
+              >
+                <Text style={styles.headerButtonText}>{headerActionLabel}</Text>
+              </Pressable>
+            )}
+          </View>
         </View>
 
         {isLoading ? (
@@ -124,54 +210,136 @@ export function HistoryCard() {
         ) : (
           <>
             <View style={styles.list}>
-              {visibleItems.map(item => (
-                <View key={item.id} style={styles.row}>
-                  <View style={styles.left}>
-                    <Text style={styles.fileName} numberOfLines={1}>
-                      {item.fileName}
-                    </Text>
-                    <Text style={styles.meta}>
-                      {item.format} • {formatDate(item.createdAt)}
-                    </Text>
-                  </View>
+              {visibleItems.map(item => {
+                const isSelected = selectedIds.includes(item.id);
 
-                  <View style={styles.rightActions}>
-                    <View style={styles.badge}>
-                      <Text style={styles.badgeText}>{item.format}</Text>
+                return (
+                  <Pressable
+                    key={item.id}
+                    onPress={() => {
+                      if (isSelectMode) toggleSelect(item.id);
+                    }}
+                    disabled={!isSelectMode}
+                    style={[
+                      styles.row,
+                      isSelectMode && styles.rowSelectable,
+                      isSelectMode && isSelected && styles.rowSelected,
+                    ]}
+                  >
+                    <View style={styles.left}>
+                      <View style={styles.nameRow}>
+                        {isSelectMode && (
+                          <Icon
+                            name={
+                              isSelected
+                                ? 'check-box'
+                                : 'check-box-outline-blank'
+                            }
+                            size={18}
+                            color={
+                              isSelected ? colors.primary : colors.mutedText
+                            }
+                          />
+                        )}
+
+                        <Text style={styles.fileName} numberOfLines={1}>
+                          {item.fileName}
+                        </Text>
+                      </View>
+
+                      <Text style={styles.meta}>
+                        {item.format} • {formatDate(item.createdAt)}
+                      </Text>
                     </View>
 
-                    <Pressable
-                      onPress={() => doExport(item)}
-                      onLongPress={() => setRenameItem(item)}
-                      delayLongPress={250}
-                      hitSlop={10}
-                      style={styles.actionButton}
-                      disabled={exportingId === item.id}
-                    >
-                      {exportingId === item.id ? (
-                        <ActivityIndicator />
-                      ) : (
-                        <Icon
-                          name="file-download"
-                          size={18}
-                          color={colors.text}
-                        />
-                      )}
-                    </Pressable>
+                    <View style={styles.rightActions}>
+                      <View style={styles.badge}>
+                        <Text style={styles.badgeText}>{item.format}</Text>
+                      </View>
 
-                    <Pressable
-                      onPress={() => onAskDelete(item.id)}
-                      hitSlop={10}
-                      style={styles.actionButton}
-                    >
-                      <Icon name="delete" size={18} color={colors.danger} />
-                    </Pressable>
-                  </View>
-                </View>
-              ))}
+                      {!isSelectMode && (
+                        <>
+                          <Pressable
+                            onPress={() => doExport(item)}
+                            onLongPress={() => setRenameItem(item)}
+                            delayLongPress={250}
+                            hitSlop={10}
+                            style={styles.actionButton}
+                            disabled={exportingId === item.id}
+                          >
+                            {exportingId === item.id ? (
+                              <ActivityIndicator />
+                            ) : (
+                              <Icon
+                                name="file-download"
+                                size={18}
+                                color={colors.text}
+                              />
+                            )}
+                          </Pressable>
+
+                          <Pressable
+                            onPress={() => onAskDelete(item.id)}
+                            hitSlop={10}
+                            style={styles.actionButton}
+                          >
+                            <Icon
+                              name="delete"
+                              size={18}
+                              color={colors.danger}
+                            />
+                          </Pressable>
+                        </>
+                      )}
+                    </View>
+                  </Pressable>
+                );
+              })}
             </View>
 
-            <Text style={styles.hint}>Segure o download para renomear</Text>
+            {isSelectMode ? (
+              <>
+                <Text style={styles.hint}>
+                  Selecione 2+ PDFs para juntar em um único arquivo.
+                </Text>
+
+                {hasNonPdfSelected && (
+                  <Text style={styles.hintError}>
+                    Por enquanto, junte apenas PDFs.
+                  </Text>
+                )}
+
+                <View style={styles.mergeBar}>
+                  <Pressable
+                    onPress={exitSelectMode}
+                    style={[styles.mergeButton, styles.mergeButtonGhost]}
+                    hitSlop={10}
+                  >
+                    <Text style={styles.mergeButtonGhostText}>Cancelar</Text>
+                  </Pressable>
+
+                  <Pressable
+                    onPress={onAskMerge}
+                    disabled={!canMerge}
+                    style={[
+                      styles.mergeButton,
+                      !canMerge && styles.mergeButtonDisabled,
+                    ]}
+                    hitSlop={10}
+                  >
+                    {isMerging ? (
+                      <ActivityIndicator />
+                    ) : (
+                      <Text style={styles.mergeButtonText}>
+                        Juntar ({selectedItems.length})
+                      </Text>
+                    )}
+                  </Pressable>
+                </View>
+              </>
+            ) : (
+              <Text style={styles.hint}>Segure o download para renomear</Text>
+            )}
           </>
         )}
       </Card>
@@ -195,6 +363,19 @@ export function HistoryCard() {
           const item = renameItem;
           setRenameItem(null);
           await doExport(item, newTitle);
+        }}
+      />
+
+      <RenameFileModal
+        visible={isMergeNamingVisible}
+        initialValue="pdf_unificado"
+        onCancel={() => {
+          setIsMergeNamingVisible(false);
+          setMergeSnapshot([]);
+        }}
+        onConfirm={async newTitle => {
+          setIsMergeNamingVisible(false);
+          await doMerge(newTitle);
         }}
       />
 
@@ -228,7 +409,19 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   title: { color: colors.text, fontSize: 14, fontWeight: '900' },
+
+  headerRight: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   right: { color: colors.mutedText, fontSize: 12, fontWeight: '900' },
+
+  headerButton: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  headerButtonText: { color: colors.text, fontSize: 11, fontWeight: '900' },
 
   desc: {
     color: colors.mutedText,
@@ -247,9 +440,19 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: colors.border,
   },
+  rowSelectable: {
+    paddingHorizontal: 6,
+    borderRadius: 12,
+  },
+  rowSelected: {
+    backgroundColor: colors.surface,
+    borderTopColor: 'transparent',
+  },
 
   left: { flex: 1 },
-  fileName: { color: colors.text, fontSize: 12, fontWeight: '900' },
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+
+  fileName: { color: colors.text, fontSize: 12, fontWeight: '900', flex: 1 },
   meta: {
     color: colors.mutedText,
     fontSize: 11,
@@ -286,4 +489,32 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     marginTop: spacing.sm,
   },
+  hintError: {
+    color: colors.danger,
+    fontSize: 11,
+    fontWeight: '800',
+    marginTop: spacing.xs,
+  },
+
+  mergeBar: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginTop: spacing.md,
+  },
+  mergeButton: {
+    flex: 1,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mergeButtonText: { color: '#fff', fontWeight: '900' },
+  mergeButtonGhost: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  mergeButtonGhostText: { color: colors.text, fontWeight: '900' },
+  mergeButtonDisabled: { opacity: 0.5 },
 });
