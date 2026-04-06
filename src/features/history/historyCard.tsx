@@ -13,7 +13,7 @@ import { Skeleton } from '../../components/Skeleton';
 interface HistoryCardProps {
   items: HistoryItem[];
   isLoading: boolean;
-  onExportToDevice: (item: HistoryItem) => Promise<any>;
+  onOpenActions: (item: HistoryItem) => void;
   externalSelectedIds: string[];
   onSelectionChange: (ids: string[]) => void;
   isSelectionEnabled: boolean;
@@ -23,7 +23,7 @@ interface HistoryCardProps {
 export function HistoryCard({
   items,
   isLoading,
-  onExportToDevice,
+  onOpenActions,
   externalSelectedIds,
   onSelectionChange,
   isSelectionEnabled,
@@ -53,9 +53,9 @@ export function HistoryCard({
         <View style={styles.itemContent}>
           <View style={styles.iconContainer}>
             <Icon
-              name={isSelected ? 'check-circle' : 'file-pdf-box'}
+              name={isSelected ? 'check-circle' : item.format === 'JPEG' ? 'file-image' : 'file-pdf-box'}
               size={30}
-              color={isSelected ? '#2563EB' : '#EF4444'}
+              color={isSelected ? '#2563EB' : item.format === 'JPEG' ? '#2563EB' : '#EF4444'}
             />
           </View>
 
@@ -71,7 +71,7 @@ export function HistoryCard({
           {!isSelectionEnabled && (
             <Pressable
               style={styles.moreButton}
-              onPress={() => onExportToDevice(item)}
+              onPress={() => onOpenActions(item)}
             >
               <Icon name="dots-vertical" size={20} color="#64748B" />
             </Pressable>

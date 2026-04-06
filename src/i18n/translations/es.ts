@@ -112,6 +112,14 @@ export default {
     mergedSavedOnly:
       'PDF combinado guardado en la app. (Falló la exportación a Descargas.)',
     mergedSuccessAlert: 'PDFs combinados correctamente.',
+
+    renameAction: 'Renombrar',
+    shareAction: 'Compartir',
+    exportAction: 'Exportar / Guardar en el dispositivo',
+    duplicateAction: 'Duplicar',
+    deleteAction: 'Eliminar',
+    duplicateSuccess: 'Archivo duplicado correctamente.',
+    duplicateFailed: 'No se pudo duplicar el archivo.',
   },
 
   rename: {

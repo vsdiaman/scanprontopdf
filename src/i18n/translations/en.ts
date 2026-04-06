@@ -110,6 +110,14 @@ export default {
     mergedExported: 'Merged PDF saved and exported to Downloads.',
     mergedSavedOnly: 'Merged PDF saved. (Export to Downloads failed.)',
     mergedSuccessAlert: 'PDFs merged successfully.',
+
+    renameAction: 'Rename',
+    shareAction: 'Share',
+    exportAction: 'Export / Save to device',
+    duplicateAction: 'Duplicate',
+    deleteAction: 'Delete',
+    duplicateSuccess: 'File duplicated successfully.',
+    duplicateFailed: 'Could not duplicate the file.',
   },
 
   rename: {

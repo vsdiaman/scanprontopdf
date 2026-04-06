@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
+import { Share } from 'react-native';
+import RNFS from 'react-native-fs';
 import { HistoryItem } from './historyTypes';
 import {
   addHistoryItem,
@@ -9,6 +11,57 @@ import {
 import { exportHistoryItemToDevice } from './exportHistoryItem';
 import { mergePdfFilesToAppFolder } from './mergePdfService';
 import { t } from '../../i18n';
+
+function stripFileScheme(path: string) {
+  return path.startsWith('file://') ? path.replace('file://', '') : path;
+}
+
+function splitFileName(fileName: string) {
+  const dotIndex = fileName.lastIndexOf('.');
+  if (dotIndex <= 0) {
+    return { base: fileName, ext: '' };
+  }
+
+  return {
+    base: fileName.slice(0, dotIndex),
+    ext: fileName.slice(dotIndex),
+  };
+}
+
+function sanitizeBaseName(value: string) {
+  return value
+    .trim()
+    .replace(/[\\/:*?"<>|]/g, '-')
+    .replace(/\s+/g, ' ')
+    .slice(0, 60);
+}
+
+async function buildUniquePath(
+  folderPath: string,
+  baseName: string,
+  extension: string,
+) {
+  const cleanBaseName = sanitizeBaseName(baseName) || `${Date.now()}`;
+  let attempt = 0;
+
+  while (attempt < 200) {
+    const suffix = attempt === 0 ? '' : `_${Date.now()}_${attempt}`;
+    const candidateName = `${cleanBaseName}${suffix}${extension}`;
+    const candidatePath = `${folderPath}/${candidateName}`;
+
+    const exists = await RNFS.exists(candidatePath);
+    if (!exists) {
+      return {
+        fileName: candidateName,
+        fullPath: candidatePath,
+      };
+    }
+
+    attempt += 1;
+  }
+
+  throw new Error(t('history.duplicateFailed'));
+}
 
 export function useHistory() {
   const [items, setItems] = useState<HistoryItem[]>([]);
@@ -25,9 +78,94 @@ export function useHistory() {
   }, []);
 
   const remove = useCallback(
-    async (id: string) => {
-      await deleteHistoryItem(id);
+    async (item: HistoryItem) => {
+      const appPath = stripFileScheme(item.savedInAppPath);
+      const exists = await RNFS.exists(appPath);
+
+      if (exists) {
+        await RNFS.unlink(appPath);
+      }
+
+      await deleteHistoryItem(item.id);
       await refresh();
+    },
+    [refresh],
+  );
+
+  const rename = useCallback(
+    async (item: HistoryItem, nextBaseName: string) => {
+      const appPath = stripFileScheme(item.savedInAppPath);
+      const exists = await RNFS.exists(appPath);
+      if (!exists) {
+        throw new Error(t('export.fileMissing'));
+      }
+
+      const folderPath = appPath.slice(0, appPath.lastIndexOf('/'));
+      const { ext } = splitFileName(item.fileName);
+      const sanitizedBase = sanitizeBaseName(nextBaseName);
+      if (!sanitizedBase) {
+        throw new Error(t('export.invalidName'));
+      }
+
+      const nextFileName = `${sanitizedBase}${ext}`;
+      const nextPath = `${folderPath}/${nextFileName}`;
+
+      if (nextPath !== appPath) {
+        const conflict = await RNFS.exists(nextPath);
+        if (conflict) {
+          throw new Error(t('export.nameAlreadyExists'));
+        }
+
+        await RNFS.moveFile(appPath, nextPath);
+      }
+
+      await updateHistoryItem(item.id, {
+        fileName: nextFileName,
+        savedInAppPath: nextPath,
+      });
+      await refresh();
+    },
+    [refresh],
+  );
+
+  const share = useCallback(async (item: HistoryItem) => {
+    const appPath = stripFileScheme(item.savedInAppPath);
+    const exists = await RNFS.exists(appPath);
+    if (!exists) {
+      throw new Error(t('export.fileMissing'));
+    }
+
+    await Share.share({
+      title: item.fileName,
+      url: `file://${appPath}`,
+      message: item.fileName,
+    });
+  }, []);
+
+  const duplicate = useCallback(
+    async (item: HistoryItem) => {
+      const appPath = stripFileScheme(item.savedInAppPath);
+      const exists = await RNFS.exists(appPath);
+      if (!exists) {
+        throw new Error(t('export.fileMissing'));
+      }
+
+      const folderPath = appPath.slice(0, appPath.lastIndexOf('/'));
+      const { base, ext } = splitFileName(item.fileName);
+
+      const copyBaseName = `${base}_copy`;
+      const unique = await buildUniquePath(folderPath, copyBaseName, ext);
+
+      await RNFS.copyFile(appPath, unique.fullPath);
+
+      const created = await addHistoryItem({
+        fileName: unique.fileName,
+        format: item.format,
+        savedInAppPath: unique.fullPath,
+      });
+
+      await refresh();
+      return created;
     },
     [refresh],
   );
@@ -102,6 +240,9 @@ export function useHistory() {
     isLoading,
     refresh,
     remove,
+    rename,
+    share,
+    duplicate,
     exportToDevice,
     mergePdfsAndExport,
   };

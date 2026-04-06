@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import {
   StyleSheet,
   View,
@@ -7,6 +7,8 @@ import {
   Text,
   Alert,
   InteractionManager,
+  Modal,
+  Pressable,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -23,14 +25,32 @@ import { useHistory } from '../../features/history/useHistory';
 import { addHistoryItem } from '../../features/history/historyRepository';
 import { t } from '../../i18n';
 import { Loading } from '../../components/Loading';
+import { HistoryItem } from '../../features/history/historyTypes';
+import { RenameFileModal } from '../../components/RenameFileModal';
+import { ConfirmDeleteModal } from '../../components/ConfirmDeleteModal';
 
 export function HomeScreen({ navigation }: any) {
   const insets = useSafeAreaInsets();
-  const { items, refresh, isLoading, exportToDevice, mergePdfsAndExport } =
-    useHistory();
+  const {
+    items,
+    refresh,
+    isLoading,
+    exportToDevice,
+    mergePdfsAndExport,
+    rename,
+    share,
+    duplicate,
+    remove,
+  } = useHistory();
+
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isSelectionEnabled, setIsSelectionEnabled] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
+
+  const [activeItem, setActiveItem] = useState<HistoryItem | null>(null);
+  const [isActionMenuVisible, setIsActionMenuVisible] = useState(false);
+  const [isRenameVisible, setIsRenameVisible] = useState(false);
+  const [isDeleteVisible, setIsDeleteVisible] = useState(false);
 
   const handleStartScan = () => navigation.navigate('Scan');
 
@@ -65,7 +85,6 @@ export function HomeScreen({ navigation }: any) {
         const fileName = `${Date.now()}_${file.name || t('home.importedDefaultFileName')}`;
         const destinationPath = `${folderPath}/${fileName}`;
 
-        // RNFS precisa do path limpo no Android
         const cleanSrc = file.uri.replace('file://', '');
         await RNFS.copyFile(cleanSrc, destinationPath);
 
@@ -102,9 +121,96 @@ export function HomeScreen({ navigation }: any) {
     }
   };
 
+  const closeActionMenu = useCallback(() => {
+    setIsActionMenuVisible(false);
+  }, []);
+
+  const openActionMenu = useCallback((item: HistoryItem) => {
+    setActiveItem(item);
+    setIsActionMenuVisible(true);
+  }, []);
+
+  const activeBaseName = useMemo(() => {
+    if (!activeItem) return '';
+    const dotIndex = activeItem.fileName.lastIndexOf('.');
+    if (dotIndex <= 0) return activeItem.fileName;
+    return activeItem.fileName.slice(0, dotIndex);
+  }, [activeItem]);
+
+  const runItemAction = useCallback(
+    async (action: () => Promise<void>) => {
+      closeActionMenu();
+      try {
+        await action();
+      } catch (error: any) {
+        Alert.alert(t('common.error'), error?.message || t('preview.modalSaveErrorFallback'));
+      }
+    },
+    [closeActionMenu],
+  );
+
+  const handleExport = useCallback(() => {
+    if (!activeItem) return;
+    runItemAction(async () => {
+      const result = await exportToDevice(activeItem);
+      Alert.alert(t('common.success'), result.message || t('history.exportFail'));
+    });
+  }, [activeItem, exportToDevice, runItemAction]);
+
+  const handleShare = useCallback(() => {
+    if (!activeItem) return;
+    runItemAction(async () => {
+      await share(activeItem);
+    });
+  }, [activeItem, runItemAction, share]);
+
+  const handleDuplicate = useCallback(() => {
+    if (!activeItem) return;
+    runItemAction(async () => {
+      await duplicate(activeItem);
+      Alert.alert(t('common.success'), t('history.duplicateSuccess'));
+    });
+  }, [activeItem, duplicate, runItemAction]);
+
+  const openRename = useCallback(() => {
+    closeActionMenu();
+    setIsRenameVisible(true);
+  }, [closeActionMenu]);
+
+  const openDeleteConfirm = useCallback(() => {
+    closeActionMenu();
+    setIsDeleteVisible(true);
+  }, [closeActionMenu]);
+
+  const handleRenameConfirm = useCallback(
+    async (nextBaseName: string) => {
+      if (!activeItem) return;
+
+      try {
+        await rename(activeItem, nextBaseName);
+        setIsRenameVisible(false);
+      } catch (error: any) {
+        Alert.alert(t('common.error'), error?.message || t('preview.modalSaveErrorFallback'));
+      }
+    },
+    [activeItem, rename],
+  );
+
+  const handleDeleteConfirm = useCallback(async () => {
+    if (!activeItem) return;
+
+    try {
+      await remove(activeItem);
+      setIsDeleteVisible(false);
+      setActiveItem(null);
+    } catch (error: any) {
+      Alert.alert(t('common.error'), error?.message || t('preview.modalSaveErrorFallback'));
+    }
+  }, [activeItem, remove]);
+
   return (
     <View style={styles.container}>
-      <View style={[styles.headerWrap, { paddingTop: insets.top }]}>
+      <View style={[styles.headerWrap, { paddingTop: insets.top }]}> 
         <AppHeader
           title={t('home.headerTitle')}
           subtitle={t('home.headerSubtitle')}
@@ -167,13 +273,60 @@ export function HomeScreen({ navigation }: any) {
         <HistoryCard
           items={items}
           isLoading={isLoading}
-          onExportToDevice={exportToDevice}
+          onOpenActions={openActionMenu}
           externalSelectedIds={selectedIds}
           onSelectionChange={setSelectedIds}
           isSelectionEnabled={isSelectionEnabled}
           onToggleSelectionMode={setIsSelectionEnabled}
         />
       </ScrollView>
+
+      <Modal
+        visible={isActionMenuVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={closeActionMenu}
+      >
+        <Pressable style={styles.actionBackdrop} onPress={closeActionMenu} />
+        <View style={styles.actionModalWrap}>
+          <View style={styles.actionCard}>
+            <Pressable style={styles.actionMenuItem} onPress={openRename}>
+              <Text style={styles.actionMenuText}>{t('history.renameAction')}</Text>
+            </Pressable>
+            <Pressable style={styles.actionMenuItem} onPress={handleShare}>
+              <Text style={styles.actionMenuText}>{t('history.shareAction')}</Text>
+            </Pressable>
+            <Pressable style={styles.actionMenuItem} onPress={handleExport}>
+              <Text style={styles.actionMenuText}>{t('history.exportAction')}</Text>
+            </Pressable>
+            <Pressable style={styles.actionMenuItem} onPress={handleDuplicate}>
+              <Text style={styles.actionMenuText}>{t('history.duplicateAction')}</Text>
+            </Pressable>
+            <Pressable style={styles.actionMenuItem} onPress={openDeleteConfirm}>
+              <Text style={styles.actionMenuTextDanger}>{t('history.deleteAction')}</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+
+      <RenameFileModal
+        visible={isRenameVisible}
+        initialValue={activeBaseName}
+        onCancel={() => setIsRenameVisible(false)}
+        onConfirm={handleRenameConfirm}
+      />
+
+      <ConfirmDeleteModal
+        visible={isDeleteVisible}
+        message={
+          activeItem?.fileName
+            ? t('history.deleteMessageWithName', { name: activeItem.fileName })
+            : t('history.deleteMessageFallback')
+        }
+        confirmLabel={t('history.deleteAction')}
+        onCancel={() => setIsDeleteVisible(false)}
+        onConfirm={handleDeleteConfirm}
+      />
 
       <View style={[styles.bannerWrap, { paddingBottom: insets.bottom }]}>
         <BannerBottom />
@@ -235,6 +388,39 @@ const styles = StyleSheet.create({
   },
   buttonText: { fontWeight: '700', fontSize: 15, color: '#1E293B' },
   buttonDisabled: { opacity: 0.4, borderColor: '#CBD5E1' },
+  actionBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(11,18,32,0.45)',
+  },
+  actionModalWrap: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    padding: spacing.lg,
+  },
+  actionCard: {
+    borderRadius: 16,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    overflow: 'hidden',
+  },
+  actionMenuItem: {
+    height: 50,
+    justifyContent: 'center',
+    paddingHorizontal: spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  actionMenuText: {
+    color: '#1E293B',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  actionMenuTextDanger: {
+    color: '#EF4444',
+    fontSize: 14,
+    fontWeight: '700',
+  },
   bannerWrap: {
     position: 'absolute',
     bottom: 0,
