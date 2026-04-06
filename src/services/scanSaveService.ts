@@ -41,6 +41,30 @@ function sanitizeFileName(rawName: string) {
     .replace(/[^a-zA-Z0-9_-]/g, '');
 }
 
+function addUniqueSuffix(fileName: string) {
+  const ts = Date.now();
+  const dotIndex = fileName.lastIndexOf('.');
+  if (dotIndex <= 0) return `${fileName}_${ts}`;
+
+  const base = fileName.slice(0, dotIndex);
+  const ext = fileName.slice(dotIndex);
+  return `${base}_${ts}${ext}`;
+}
+
+function isNameConflictError(error: unknown) {
+  const message = String((error as any)?.message ?? '').toLowerCase();
+  const code = String((error as any)?.code ?? '').toLowerCase();
+
+  return (
+    code === 'eexist' ||
+    message.includes('already exists') ||
+    message.includes('already-exists') ||
+    message.includes('file exists') ||
+    message.includes('name already') ||
+    message.includes('duplicate')
+  );
+}
+
 async function ensureAppFolder() {
   const exists = await RNFS.exists(APP_FOLDER);
   if (!exists) await RNFS.mkdir(APP_FOLDER);
@@ -220,18 +244,38 @@ async function exportPdfToDownloads(appPdfPath: string, safeName: string) {
 
         return contentUri as string;
       }
-    } catch {
-      // fallback
+    } catch (error) {
+      if (isNameConflictError(error)) {
+        try {
+          const mediaCollection = (ReactNativeBlobUtil as any)?.MediaCollection;
+          const fallbackDisplayName = addUniqueSuffix(displayName);
+          const contentUri = await mediaCollection.copyToMediaStore(
+            {
+              name: fallbackDisplayName,
+              parentFolder: 'ScannerProntoPDF',
+              mimeType: 'application/pdf',
+            },
+            'Download',
+            pdfPath,
+          );
+          return contentUri as string;
+        } catch {
+          // fallback for legacy path below
+        }
+      }
     }
   }
 
   const downloadsDir = RNFS.DownloadDirectoryPath;
   if (!downloadsDir) return undefined;
 
-  const exportedPath = `${downloadsDir}/${displayName}`;
+  let exportedPath = `${downloadsDir}/${displayName}`;
   try {
     const exists = await RNFS.exists(exportedPath);
-    if (exists) await RNFS.unlink(exportedPath);
+    if (exists) {
+      const fallbackDisplayName = addUniqueSuffix(displayName);
+      exportedPath = `${downloadsDir}/${fallbackDisplayName}`;
+    }
 
     await RNFS.copyFile(pdfPath, exportedPath);
     return exportedPath;

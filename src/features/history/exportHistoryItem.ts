@@ -45,6 +45,20 @@ function addUniqueSuffix(fileName: string) {
   return `${base}_${ts}${ext}`;
 }
 
+function isNameConflictError(error: unknown) {
+  const message = String((error as any)?.message ?? '').toLowerCase();
+  const code = String((error as any)?.code ?? '').toLowerCase();
+
+  return (
+    code === 'eexist' ||
+    message.includes('already exists') ||
+    message.includes('already-exists') ||
+    message.includes('file exists') ||
+    message.includes('name already') ||
+    message.includes('duplicate')
+  );
+}
+
 async function ensureLegacyWritePermission() {
   if (Platform.OS !== 'android') return true;
 
@@ -96,14 +110,21 @@ async function exportPdfAndroid29Plus(appPath: string, displayName: string) {
   return contentUri as string;
 }
 
-async function exportPdfLegacy(appPath: string, displayName: string) {
+async function exportPdfLegacy(
+  appPath: string,
+  displayName: string,
+  isRenaming: boolean,
+) {
   const downloadsDir = RNFS.DownloadDirectoryPath;
   if (!downloadsDir) return undefined;
 
-  const exportedPath = `${downloadsDir}/${displayName}`;
+  let exportedPath = `${downloadsDir}/${displayName}`;
 
   const exists = await RNFS.exists(exportedPath);
-  if (exists) await RNFS.unlink(exportedPath);
+  if (exists) {
+    if (isRenaming) throw new Error(t('export.nameAlreadyExists'));
+    exportedPath = `${downloadsDir}/${addUniqueSuffix(displayName)}`;
+  }
 
   await RNFS.copyFile(stripFileScheme(appPath), exportedPath);
   return exportedPath;
@@ -148,9 +169,18 @@ export async function exportHistoryItemToDevice(
           displayName,
         );
         return { exportedPath, message: t('export.jpegExported') };
-      } catch {
+      } catch (error) {
         // Se o usuário escolheu nome (rename), não mexe no nome: manda ele trocar.
-        if (isRenaming) throw new Error(t('export.nameAlreadyExists'));
+        if (isRenaming) {
+          if (isNameConflictError(error)) {
+            throw new Error(t('export.nameAlreadyExists'));
+          }
+          throw error;
+        }
+
+        if (!isNameConflictError(error)) {
+          throw error;
+        }
 
         // Se foi clique normal, tenta com sufixo pra evitar conflito.
         const fallbackName = addUniqueSuffix(displayName);
@@ -186,8 +216,17 @@ export async function exportHistoryItemToDevice(
         displayName,
       );
       return { exportedPath, message: t('export.pdfExported') };
-    } catch {
-      if (isRenaming) throw new Error(t('export.nameAlreadyExists'));
+    } catch (error) {
+      if (isRenaming) {
+        if (isNameConflictError(error)) {
+          throw new Error(t('export.nameAlreadyExists'));
+        }
+        throw error;
+      }
+
+      if (!isNameConflictError(error)) {
+        throw error;
+      }
 
       const fallbackName = addUniqueSuffix(displayName);
       const exportedPath = await exportPdfAndroid29Plus(
@@ -201,7 +240,11 @@ export async function exportHistoryItemToDevice(
   const allowed = await ensureLegacyWritePermission();
   if (!allowed) throw new Error(t('export.permissionDeniedDownloads'));
 
-  const exportedPath = await exportPdfLegacy(item.savedInAppPath, displayName);
+  const exportedPath = await exportPdfLegacy(
+    item.savedInAppPath,
+    displayName,
+    isRenaming,
+  );
   if (exportedPath) return { exportedPath, message: t('export.pdfExported') };
 
   return { exportedPath: undefined, message: t('export.pdfSavedOnly') };
