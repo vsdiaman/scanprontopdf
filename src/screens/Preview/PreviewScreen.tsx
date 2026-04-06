@@ -27,6 +27,7 @@ import {
 } from '../../services/scanSaveService';
 import { addHistoryItem } from '../../features/history/historyRepository';
 import { t } from '../../i18n';
+import { generateDefaultFileId } from '../../utils/generateDefaultFileId';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Preview'>;
 
@@ -41,7 +42,7 @@ export function PreviewScreen({ navigation, route }: Props) {
   const { imageUri, imageUris } = route.params;
 
   const [saveFormat, setSaveFormat] = useState<SaveFormat>('PDF');
-  const [fileName, setFileName] = useState('scan_001');
+  const [fileName, setFileName] = useState(() => generateDefaultFileId());
   const [isSaving, setIsSaving] = useState(false);
 
   const [isModalVisible, setIsModalVisible] = useState(false);
@@ -58,10 +59,15 @@ export function PreviewScreen({ navigation, route }: Props) {
     };
   }, []);
 
+  useEffect(() => {
+    const nextDefaultName = generateDefaultFileId();
+    setFileName(nextDefaultName);
+  }, [imageUri, imageUris]);
+
   const fileExtension = saveFormat === 'PDF' ? '.pdf' : '.jpg';
 
   const safeBaseName = useMemo(() => {
-    return sanitizeFileName(fileName) || 'scan';
+    return sanitizeFileName(fileName) || generateDefaultFileId();
   }, [fileName]);
 
   const finalFileName = useMemo(() => {
