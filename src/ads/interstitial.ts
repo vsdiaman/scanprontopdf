@@ -13,6 +13,7 @@ const COOLDOWN_MS = 90_000;
 
 let interstitialAd: InterstitialAd | null = null;
 let isLoaded = false;
+let isShowing = false;
 let lastShownAt = 0;
 
 function getInterstitialAd() {
@@ -28,11 +29,13 @@ function getInterstitialAd() {
 
   interstitialAd.addAdEventListener(AdEventType.CLOSED, () => {
     isLoaded = false;
+    isShowing = false;
     loadInterstitial();
   });
 
   interstitialAd.addAdEventListener(AdEventType.ERROR, () => {
     isLoaded = false;
+    isShowing = false;
     loadInterstitial();
   });
 
@@ -48,9 +51,19 @@ export async function showInterstitialIfReady() {
   const now = Date.now();
 
   if (!isLoaded) return false;
+  if (isShowing) return false;
   if (now - lastShownAt < COOLDOWN_MS) return false;
 
+  const ad = getInterstitialAd();
+
+  isShowing = true;
   lastShownAt = now;
-  await interstitialAd!.show();
-  return true;
+
+  try {
+    await ad.show();
+    return true;
+  } catch {
+    isShowing = false;
+    return false;
+  }
 }

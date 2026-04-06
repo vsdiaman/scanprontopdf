@@ -2,6 +2,7 @@ import React from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { colors } from '../theme/colors';
 import { spacing } from '../theme/spacing';
+import { t } from '../i18n';
 
 type Props = {
   visible: boolean;
@@ -15,10 +16,10 @@ type Props = {
 
 export function ConfirmDeleteModal({
   visible,
-  title = 'Apagar',
+  title = t('history.deleteTitle'),
   message,
-  confirmLabel = 'Sim, apagar',
-  cancelLabel = 'Não',
+  confirmLabel = t('common.ok'),
+  cancelLabel = t('common.cancel'),
   onConfirm,
   onCancel,
 }: Props) {

@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   Text,
   Alert,
-  Platform,
   InteractionManager,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -21,6 +20,7 @@ import { HistoryCard } from '../../features/history/historyCard';
 import { BannerBottom } from '../../components/BannerBottom';
 import { useHistory } from '../../features/history/useHistory';
 import { addHistoryItem } from '../../features/history/historyRepository';
+import { t } from '../../i18n';
 
 export function HomeScreen({ navigation }: any) {
   const insets = useSafeAreaInsets();
@@ -52,16 +52,15 @@ export function HomeScreen({ navigation }: any) {
           await RNFS.mkdir(folderPath);
         }
 
-        const fileName = `${Date.now()}_${file.name || 'documento.pdf'}`;
+        const fileName = `${Date.now()}_${file.name || t('home.importedDefaultFileName')}`;
         const destinationPath = `${folderPath}/${fileName}`;
 
         // RNFS precisa do path limpo no Android
         const cleanSrc = file.uri.replace('file://', '');
         await RNFS.copyFile(cleanSrc, destinationPath);
 
-        // Plugando no seu historyRepository
         await addHistoryItem({
-          fileName: file.name || 'Importado',
+          fileName: file.name || t('home.importedDefaultName'),
           format: 'PDF',
           savedInAppPath: destinationPath,
         });
@@ -69,7 +68,7 @@ export function HomeScreen({ navigation }: any) {
         refresh();
       } catch (err: any) {
         if (!DocumentPicker.isCancel(err)) {
-          console.log('Erro Picker:', err);
+          console.log(t('home.importErrorLog'), err);
         }
       }
     });
@@ -81,19 +80,22 @@ export function HomeScreen({ navigation }: any) {
 
     try {
       const mergedFileName = `Merged_${Date.now()}`;
-      await mergePdfsAndExport(selectedItems, mergedFileName);
+      const result = await mergePdfsAndExport(selectedItems, mergedFileName);
       setSelectedIds([]);
       setIsSelectionEnabled(false);
-      Alert.alert('Sucesso', 'PDFs mesclados!');
+      Alert.alert(t('common.success'), result.message || t('history.mergedSuccessAlert'));
     } catch (err: any) {
-      Alert.alert('Erro', err.message);
+      Alert.alert(t('common.error'), err.message);
     }
   };
 
   return (
     <View style={styles.container}>
       <View style={[styles.headerWrap, { paddingTop: insets.top }]}>
-        <AppHeader title="DocStack" subtitle="Gerencie seus documentos" />
+        <AppHeader
+          title={t('home.headerTitle')}
+          subtitle={t('home.headerSubtitle')}
+        />
       </View>
 
       <ScrollView
@@ -107,10 +109,8 @@ export function HomeScreen({ navigation }: any) {
           <View style={styles.uploadCircle}>
             <Icon name="file-upload-outline" size={32} color={colors.primary} />
           </View>
-          <Text style={styles.uploadTitle}>Importar PDF</Text>
-          <Text style={styles.uploadSubtitle}>
-            Escolha um arquivo do seu celular
-          </Text>
+          <Text style={styles.uploadTitle}>{t('home.importPdfTitle')}</Text>
+          <Text style={styles.uploadSubtitle}>{t('home.importPdfSubtitle')}</Text>
         </TouchableOpacity>
 
         <View style={styles.actionRow}>
@@ -119,7 +119,7 @@ export function HomeScreen({ navigation }: any) {
             onPress={handleStartScan}
           >
             <Icon name="camera-plus-outline" size={24} color="#1E293B" />
-            <Text style={styles.buttonText}>Escanear</Text>
+            <Text style={styles.buttonText}>{t('home.scanButton')}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -141,7 +141,7 @@ export function HomeScreen({ navigation }: any) {
                 selectedIds.length < 2 && { color: '#94A3B8' },
               ]}
             >
-              Mesclar ({selectedIds.length})
+              {t('home.mergeButton', { count: selectedIds.length })}
             </Text>
           </TouchableOpacity>
         </View>
