@@ -1,22 +1,29 @@
 import { I18n } from 'i18n-js';
 import { getLocales } from 'react-native-localize';
 
-import ptBR from './translations/pt-BR';
+import pt from './translations/pt-BR';
 import en from './translations/en';
+import es from './translations/es';
+
+const DEFAULT_LOCALE = 'pt';
 
 const i18n = new I18n({
+  pt,
+  'pt-BR': pt,
   en,
-  'pt-BR': ptBR,
-  pt: ptBR,
+  es,
 });
 
 i18n.enableFallback = true;
+i18n.defaultLocale = DEFAULT_LOCALE;
 
-function pickLocale() {
-  const localeTag = getLocales()[0]?.languageTag ?? 'en';
+type SupportedLocale = 'pt' | 'en' | 'es';
 
-  // pt-PT, pt-AO, etc -> pt
-  if (localeTag.startsWith('pt')) return 'pt-BR';
+function pickLocale(): SupportedLocale {
+  const localeTag = getLocales()[0]?.languageTag?.toLowerCase() ?? DEFAULT_LOCALE;
+
+  if (localeTag.startsWith('pt')) return 'pt';
+  if (localeTag.startsWith('es')) return 'es';
 
   return 'en';
 }

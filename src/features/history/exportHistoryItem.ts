@@ -148,7 +148,7 @@ export async function exportHistoryItemToDevice(
           displayName,
         );
         return { exportedPath, message: t('export.jpegExported') };
-      } catch (error) {
+      } catch {
         // Se o usuário escolheu nome (rename), não mexe no nome: manda ele trocar.
         if (isRenaming) throw new Error(t('export.nameAlreadyExists'));
 
@@ -186,7 +186,7 @@ export async function exportHistoryItemToDevice(
         displayName,
       );
       return { exportedPath, message: t('export.pdfExported') };
-    } catch (error) {
+    } catch {
       if (isRenaming) throw new Error(t('export.nameAlreadyExists'));
 
       const fallbackName = addUniqueSuffix(displayName);

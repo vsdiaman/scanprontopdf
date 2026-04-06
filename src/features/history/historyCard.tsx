@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React from 'react';
 import {
   StyleSheet,
   Text,
@@ -9,6 +9,7 @@ import {
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useHistory } from './useHistory';
 import { HistoryItem } from './historyTypes';
+import { t } from '../../i18n';
 
 interface HistoryCardProps {
   externalSelectedIds: string[];
@@ -23,7 +24,7 @@ export function HistoryCard({
   isSelectionEnabled,
   onToggleSelectionMode,
 }: HistoryCardProps) {
-  const { items, isLoading, remove, exportToDevice } = useHistory();
+  const { items, isLoading, exportToDevice } = useHistory();
 
   const toggleItem = (id: string) => {
     if (!isSelectionEnabled) onToggleSelectionMode(true);
@@ -80,7 +81,7 @@ export function HistoryCard({
   return (
     <View style={styles.container}>
       <View style={styles.listHeader}>
-        <Text style={styles.sectionTitle}>Documentos Recentes</Text>
+        <Text style={styles.sectionTitle}>{t('history.recentDocsTitle')}</Text>
         {isSelectionEnabled && (
           <Pressable
             onPress={() => {
@@ -88,7 +89,7 @@ export function HistoryCard({
               onToggleSelectionMode(false);
             }}
           >
-            <Text style={styles.cancelText}>Cancelar</Text>
+            <Text style={styles.cancelText}>{t('history.cancel')}</Text>
           </Pressable>
         )}
       </View>
@@ -96,7 +97,7 @@ export function HistoryCard({
       {isLoading ? (
         <ActivityIndicator style={{ marginTop: 20 }} />
       ) : items.length === 0 ? (
-        <Text style={styles.emptyText}>Nenhum documento encontrado.</Text>
+        <Text style={styles.emptyText}>{t('history.empty')}</Text>
       ) : (
         <View style={styles.list}>{items.map(renderItem)}</View>
       )}

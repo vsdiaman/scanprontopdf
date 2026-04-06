@@ -6,6 +6,7 @@ export default {
     save: 'Salvar',
     saving: 'Salvando...',
     error: 'Erro',
+    success: 'Sucesso',
     permission: 'Permissão',
     loading: 'Carregando...',
   },
@@ -34,10 +35,13 @@ export default {
   home: {
     headerTitle: 'Scanner Pronto PDF',
     headerSubtitle: 'Escaneie em 1 toque 😊',
-
-    heroTitle: 'Scaneie seu documento',
-    heroDesc: 'Fluxo simples: capturar → escolher formato → salvar.',
-    heroButton: 'Escanear agora',
+    importPdfTitle: 'Importar PDF',
+    importPdfSubtitle: 'Escolha um arquivo do seu celular',
+    scanButton: 'Escanear',
+    mergeButton: 'Mesclar (%{count})',
+    importedDefaultName: 'Importado',
+    importedDefaultFileName: 'documento.pdf',
+    importErrorLog: 'Erro ao importar PDF:',
   },
 
   scan: {
@@ -79,7 +83,7 @@ export default {
     savedCount: '%{count} salvos',
     select: 'Selecionar',
     cancel: 'Cancelar',
-
+    recentDocsTitle: 'Documentos recentes',
     empty: 'Nenhum arquivo ainda.',
     tipHoldDownload: 'Segure o download para renomear',
 
@@ -105,6 +109,7 @@ export default {
     mergedExported: 'PDF unificado salvo no app e exportado para Downloads.',
     mergedSavedOnly:
       'PDF unificado salvo no app. (Falhou exportar para Downloads.)',
+    mergedSuccessAlert: 'PDFs mesclados com sucesso.',
   },
 
   rename: {
@@ -120,7 +125,7 @@ export default {
     mediaStoreUnavailable: 'MediaStore indisponível neste aparelho.',
     permissionDeniedGallery: 'Permissão negada para salvar na galeria.',
     permissionDeniedDownloads: 'Permissão negada para salvar em Downloads.',
-    jpegExported: 'JPEG exportado para a Galeria.',
+    jpegExported: 'JPEG exportado para a galeria.',
     pdfExported: 'PDF exportado para Downloads.',
     pdfSavedOnly: 'PDF salvo no app, mas falhou exportar para Downloads.',
     alreadyExported: 'Este arquivo já foi exportado.',

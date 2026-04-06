@@ -1,6 +1,7 @@
-import React, { useCallback, useEffect } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import {
   Alert,
+  InteractionManager,
   PermissionsAndroid,
   Platform,
   ScrollView,
@@ -52,32 +53,67 @@ async function ensureCameraPermission() {
 export function ScanScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
 
+  const isMountedRef = useRef(true);
+  const isProcessingRef = useRef(false);
+  const hasNavigatedRef = useRef(false);
+  const hasShownAdRef = useRef(false);
+
   useEffect(() => {
+    isMountedRef.current = true;
     loadInterstitial();
+
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  const safeShowAd = useCallback(() => {
+    if (hasShownAdRef.current) return;
+
+    hasShownAdRef.current = true;
+    InteractionManager.runAfterInteractions(() => {
+      setTimeout(() => {
+        showInterstitialIfReady().catch(() => {
+          // anúncio não pode quebrar fluxo
+        });
+      }, 200);
+    });
   }, []);
 
   const startScan = useCallback(async () => {
-    const allowed = await ensureCameraPermission();
-    if (!allowed) return;
+    if (isProcessingRef.current) return;
 
-    await showInterstitialIfReady();
+    isProcessingRef.current = true;
 
     try {
+      const allowed = await ensureCameraPermission();
+      if (!allowed) return;
+
       const { scannedImages, status } = await DocumentScanner.scanDocument({
         croppedImageQuality: 90,
       });
 
       if (status !== 'success' || !scannedImages?.length) {
-        navigation.goBack();
+        if (isMountedRef.current) navigation.goBack();
         return;
       }
 
       const imageUri = normalizeUri(scannedImages[0]);
-      navigation.replace('Preview', { imageUri });
+
+      if (!hasNavigatedRef.current && isMountedRef.current) {
+        hasNavigatedRef.current = true;
+        navigation.replace('Preview', { imageUri });
+      }
+
+      safeShowAd();
     } catch {
-      Alert.alert(t('common.error'), t('scan.startError'));
+      if (isMountedRef.current) {
+        Alert.alert(t('common.error'), t('scan.startError'));
+      }
+    } finally {
+      isProcessingRef.current = false;
     }
-  }, [navigation]);
+  }, [navigation, safeShowAd]);
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>

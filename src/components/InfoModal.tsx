@@ -2,6 +2,7 @@ import React from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { colors } from '../theme/colors';
 import { spacing } from '../theme/spacing';
+import { t } from '../i18n';
 
 type Props = {
   visible: boolean;
@@ -15,7 +16,7 @@ export function InfoModal({
   visible,
   title,
   message,
-  confirmText = 'Entendi',
+  confirmText = t('common.ok'),
   onConfirm,
 }: Props) {
   return (

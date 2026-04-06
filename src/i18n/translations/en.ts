@@ -6,6 +6,7 @@ export default {
     save: 'Save',
     saving: 'Saving...',
     error: 'Error',
+    success: 'Success',
     permission: 'Permission',
     loading: 'Loading...',
   },
@@ -34,10 +35,13 @@ export default {
   home: {
     headerTitle: 'Scanner Pronto PDF',
     headerSubtitle: 'Scan in 1 tap',
-
-    heroTitle: 'Scan your document',
-    heroDesc: 'Simple flow: capture → choose format → save.',
-    heroButton: 'Scan now',
+    importPdfTitle: 'Import PDF',
+    importPdfSubtitle: 'Choose a file from your phone',
+    scanButton: 'Scan',
+    mergeButton: 'Merge (%{count})',
+    importedDefaultName: 'Imported',
+    importedDefaultFileName: 'document.pdf',
+    importErrorLog: 'PDF import error:',
   },
 
   scan: {
@@ -79,7 +83,7 @@ export default {
     savedCount: '%{count} saved',
     select: 'Select',
     cancel: 'Cancel',
-
+    recentDocsTitle: 'Recent documents',
     empty: 'No files yet.',
     tipHoldDownload: 'Hold download to rename',
 
@@ -105,6 +109,7 @@ export default {
     mergeMissingPdf: 'One of the selected PDFs no longer exists in the app.',
     mergedExported: 'Merged PDF saved and exported to Downloads.',
     mergedSavedOnly: 'Merged PDF saved. (Export to Downloads failed.)',
+    mergedSuccessAlert: 'PDFs merged successfully.',
   },
 
   rename: {
@@ -120,7 +125,7 @@ export default {
     mediaStoreUnavailable: 'MediaStore unavailable on this device.',
     permissionDeniedGallery: 'Permission denied to save to gallery.',
     permissionDeniedDownloads: 'Permission denied to save to Downloads.',
-    jpegExported: 'JPEG exported to Gallery.',
+    jpegExported: 'JPEG exported to gallery.',
     pdfExported: 'PDF exported to Downloads.',
     pdfSavedOnly: 'PDF saved in the app, but export to Downloads failed.',
     alreadyExported: 'This file has already been exported.',
