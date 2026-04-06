@@ -45,12 +45,25 @@ async function ensureAppFolder() {
   if (!exists) await RNFS.mkdir(APP_FOLDER);
 }
 
+async function ensureFileExists(path: string, message: string) {
+  const exists = await RNFS.exists(path);
+  if (!exists) throw new Error(message);
+}
+
+function normalizeInputUri(rawUri: string) {
+  const trimmed = rawUri.trim();
+  if (!trimmed) return '';
+  return trimmed.startsWith('file://') || trimmed.startsWith('content://')
+    ? trimmed
+    : withFileScheme(trimmed);
+}
+
 function normalizeImageUris(imageUri?: string, imageUris?: string[]) {
-  const list = (imageUris ?? []).filter(Boolean);
-  if (imageUri) list.unshift(imageUri);
+  const list = (imageUris ?? []).filter(Boolean).map(normalizeInputUri);
+  if (imageUri) list.unshift(normalizeInputUri(imageUri));
 
   const seen = new Set<string>();
-  return list.filter(uri => {
+  return list.filter(Boolean).filter(uri => {
     if (seen.has(uri)) return false;
     seen.add(uri);
     return true;
@@ -59,9 +72,22 @@ function normalizeImageUris(imageUri?: string, imageUris?: string[]) {
 
 async function readUriAsBase64(uri: string) {
   if (uri.startsWith('content://')) {
-    return ReactNativeBlobUtil.fs.readFile(uri, 'base64');
+    try {
+      return await ReactNativeBlobUtil.fs.readFile(uri, 'base64');
+    } catch {
+      const tempPath = `${RNFS.CachesDirectoryPath}/scan_${Date.now()}.tmp`;
+      await RNFS.copyFile(uri, tempPath);
+      const base64 = await RNFS.readFile(tempPath, 'base64');
+      await RNFS.unlink(tempPath).catch(() => {
+        // ignore cleanup failure
+      });
+      return base64;
+    }
   }
-  return RNFS.readFile(stripFileScheme(uri), 'base64');
+
+  const path = stripFileScheme(uri);
+  await ensureFileExists(path, t('save.noImagesFromScanner'));
+  return RNFS.readFile(path, 'base64');
 }
 
 async function copyUriToPath(sourceUri: string, destinationPath: string) {
@@ -69,17 +95,25 @@ async function copyUriToPath(sourceUri: string, destinationPath: string) {
   if (alreadyExists) await RNFS.unlink(destinationPath);
 
   if (sourceUri.startsWith('content://')) {
-    const base64 = await readUriAsBase64(sourceUri);
-    await RNFS.writeFile(destinationPath, base64, 'base64');
-    return;
+    try {
+      await RNFS.copyFile(sourceUri, destinationPath);
+      return;
+    } catch {
+      const base64 = await readUriAsBase64(sourceUri);
+      await RNFS.writeFile(destinationPath, base64, 'base64');
+      return;
+    }
   }
 
-  await RNFS.copyFile(stripFileScheme(sourceUri), destinationPath);
+  const sourcePath = stripFileScheme(sourceUri);
+  await ensureFileExists(sourcePath, t('save.noImagesFromScanner'));
+  await RNFS.copyFile(sourcePath, destinationPath);
 }
 
 async function saveJpegToAppFolder(sourceUri: string, safeName: string) {
   const destinationPath = `${APP_FOLDER}/${safeName}.jpg`;
   await copyUriToPath(sourceUri, destinationPath);
+  await ensureFileExists(destinationPath, t('preview.modalSaveErrorFallback'));
   return destinationPath;
 }
 
@@ -150,12 +184,14 @@ async function buildPdfFromImagesToAppFolder(
   if (exists) await RNFS.unlink(finalPdfPath);
 
   await RNFS.writeFile(finalPdfPath, pdfBase64, 'base64');
+  await ensureFileExists(finalPdfPath, t('preview.modalSaveErrorFallback'));
   return finalPdfPath;
 }
 
 async function savePdfUriToAppFolder(pdfUri: string, safeName: string) {
   const finalPdfPath = `${APP_FOLDER}/${safeName}.pdf`;
   await copyUriToPath(pdfUri, finalPdfPath);
+  await ensureFileExists(finalPdfPath, t('preview.modalSaveErrorFallback'));
   return finalPdfPath;
 }
 
@@ -206,34 +242,45 @@ async function exportPdfToDownloads(appPdfPath: string, safeName: string) {
 export async function saveScanAndExport(input: SaveInput): Promise<SaveResult> {
   const { fileName, format, pdfUri } = input;
 
-  await ensureAppFolder();
+  try {
+    await ensureAppFolder();
 
-  const safeName = sanitizeFileName(fileName) || `scan_${Date.now()}`;
-  const imageUris = normalizeImageUris(input.imageUri, input.imageUris);
+    const safeName = sanitizeFileName(fileName) || `scan_${Date.now()}`;
+    const imageUris = normalizeImageUris(input.imageUri, input.imageUris);
 
-  if (format === 'JPEG') {
-    if (imageUris.length !== 1) {
-      throw new Error(t('save.jpegSinglePageOnly'));
+    if (format === 'JPEG') {
+      if (imageUris.length !== 1) {
+        throw new Error(t('save.jpegSinglePageOnly'));
+      }
+
+      const savedInAppPath = await saveJpegToAppFolder(imageUris[0], safeName);
+      const exportedPath = await exportJpegToGallery(savedInAppPath);
+      return { savedInAppPath, exportedPath };
     }
 
-    const savedInAppPath = await saveJpegToAppFolder(imageUris[0], safeName);
-    const exportedPath = await exportJpegToGallery(savedInAppPath);
+    let savedInAppPath: string;
+
+    if (pdfUri) {
+      savedInAppPath = await savePdfUriToAppFolder(pdfUri, safeName);
+    } else {
+      if (imageUris.length === 0) {
+        throw new Error(t('save.noImagesFromScanner'));
+      }
+      savedInAppPath = await buildPdfFromImagesToAppFolder(imageUris, safeName);
+    }
+
+    const exportedPath = await exportPdfToDownloads(savedInAppPath, safeName);
     return { savedInAppPath, exportedPath };
+  } catch (error) {
+    console.error('[scanSaveService] saveScanAndExport failed', {
+      format,
+      fileName,
+      imageCount: input.imageUris?.length ?? (input.imageUri ? 1 : 0),
+      pdfUriProvided: Boolean(pdfUri),
+      error,
+    });
+    throw error;
   }
-
-  let savedInAppPath: string;
-
-  if (pdfUri) {
-    savedInAppPath = await savePdfUriToAppFolder(pdfUri, safeName);
-  } else {
-    if (imageUris.length === 0) {
-      throw new Error(t('save.noImagesFromScanner'));
-    }
-    savedInAppPath = await buildPdfFromImagesToAppFolder(imageUris, safeName);
-  }
-
-  const exportedPath = await exportPdfToDownloads(savedInAppPath, safeName);
-  return { savedInAppPath, exportedPath };
 }
 
 export function buildSaveSuccessMessage(
