@@ -8,6 +8,7 @@ import {
   Alert,
   InteractionManager,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import * as DocumentPicker from '@react-native-documents/picker';
@@ -21,22 +22,31 @@ import { BannerBottom } from '../../components/BannerBottom';
 import { useHistory } from '../../features/history/useHistory';
 import { addHistoryItem } from '../../features/history/historyRepository';
 import { t } from '../../i18n';
+import { Loading } from '../../components/Loading';
 
 export function HomeScreen({ navigation }: any) {
   const insets = useSafeAreaInsets();
-  const { items, refresh, mergePdfsAndExport } = useHistory();
+  const { items, refresh, isLoading, exportToDevice, mergePdfsAndExport } =
+    useHistory();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isSelectionEnabled, setIsSelectionEnabled] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
 
   const handleStartScan = () => navigation.navigate('Scan');
 
+  useFocusEffect(
+    useCallback(() => {
+      refresh();
+    }, [refresh]),
+  );
+
   const handleUploadPDF = useCallback(() => {
-    // InteractionManager garante que a UI thread está livre (essencial no RN 0.83)
+    if (isImporting) return;
+    setIsImporting(true);
+
     InteractionManager.runAfterInteractions(async () => {
       try {
-        // Pequeno delay para estabilizar o contexto da Activity no Bridgeless
         await new Promise(resolve => setTimeout(resolve, 100));
-
         const pickerResult = await DocumentPicker.pick({
           type: [DocumentPicker.types.pdf],
           mode: 'import',
@@ -65,14 +75,17 @@ export function HomeScreen({ navigation }: any) {
           savedInAppPath: destinationPath,
         });
 
-        refresh();
+        await refresh();
       } catch (err: any) {
         if (!DocumentPicker.isCancel(err)) {
           console.log(t('home.importErrorLog'), err);
+          Alert.alert(t('common.error'), t('preview.modalSaveErrorFallback'));
         }
+      } finally {
+        setIsImporting(false);
       }
     });
-  }, [refresh]);
+  }, [isImporting, refresh]);
 
   const handleMergeSelection = async () => {
     const selectedItems = items.filter(item => selectedIds.includes(item.id));
@@ -105,12 +118,17 @@ export function HomeScreen({ navigation }: any) {
         ]}
         showsVerticalScrollIndicator={false}
       >
-        <TouchableOpacity style={styles.uploadCard} onPress={handleUploadPDF}>
+        <TouchableOpacity
+          style={styles.uploadCard}
+          onPress={handleUploadPDF}
+          disabled={isImporting}
+        >
           <View style={styles.uploadCircle}>
             <Icon name="file-upload-outline" size={32} color={colors.primary} />
           </View>
           <Text style={styles.uploadTitle}>{t('home.importPdfTitle')}</Text>
           <Text style={styles.uploadSubtitle}>{t('home.importPdfSubtitle')}</Text>
+          {isImporting ? <Loading inline size="small" /> : null}
         </TouchableOpacity>
 
         <View style={styles.actionRow}>
@@ -147,6 +165,9 @@ export function HomeScreen({ navigation }: any) {
         </View>
 
         <HistoryCard
+          items={items}
+          isLoading={isLoading}
+          onExportToDevice={exportToDevice}
           externalSelectedIds={selectedIds}
           onSelectionChange={setSelectedIds}
           isSelectionEnabled={isSelectionEnabled}

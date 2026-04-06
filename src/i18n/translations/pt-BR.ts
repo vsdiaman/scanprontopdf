@@ -139,6 +139,8 @@ export default {
     noImagesFromScanner: 'Nenhuma imagem recebida do scanner.',
 
     jpegSaved: 'JPEG salvo no app e na galeria.',
+    jpegSavedOnly:
+      'JPEG salvo no app. (Falhou exportar para a galeria neste aparelho.)',
     pdfSavedAndExported: 'PDF salvo no app e salvo em Downloads.',
     pdfSavedOnly:
       'PDF salvo no app. (Falhou exportar para Downloads neste aparelho.)',

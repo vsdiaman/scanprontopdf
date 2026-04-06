@@ -4,14 +4,16 @@ import {
   Text,
   View,
   Pressable,
-  ActivityIndicator,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
-import { useHistory } from './useHistory';
 import { HistoryItem } from './historyTypes';
 import { t } from '../../i18n';
+import { Skeleton } from '../../components/Skeleton';
 
 interface HistoryCardProps {
+  items: HistoryItem[];
+  isLoading: boolean;
+  onExportToDevice: (item: HistoryItem) => Promise<any>;
   externalSelectedIds: string[];
   onSelectionChange: (ids: string[]) => void;
   isSelectionEnabled: boolean;
@@ -19,13 +21,14 @@ interface HistoryCardProps {
 }
 
 export function HistoryCard({
+  items,
+  isLoading,
+  onExportToDevice,
   externalSelectedIds,
   onSelectionChange,
   isSelectionEnabled,
   onToggleSelectionMode,
 }: HistoryCardProps) {
-  const { items, isLoading, exportToDevice } = useHistory();
-
   const toggleItem = (id: string) => {
     if (!isSelectionEnabled) onToggleSelectionMode(true);
 
@@ -68,7 +71,7 @@ export function HistoryCard({
           {!isSelectionEnabled && (
             <Pressable
               style={styles.moreButton}
-              onPress={() => exportToDevice(item)}
+              onPress={() => onExportToDevice(item)}
             >
               <Icon name="dots-vertical" size={20} color="#64748B" />
             </Pressable>
@@ -94,8 +97,20 @@ export function HistoryCard({
         )}
       </View>
 
-      {isLoading ? (
-        <ActivityIndicator style={{ marginTop: 20 }} />
+      {isLoading && items.length === 0 ? (
+        <View style={styles.list}>
+          {Array.from({ length: 3 }).map((_, index) => (
+            <View key={`history-skeleton-${index}`} style={styles.itemCard}>
+              <View style={styles.itemContent}>
+                <Skeleton width={30} height={30} borderRadius={8} />
+                <View style={[styles.info, { gap: 8 }]}>
+                  <Skeleton width="80%" height={14} />
+                  <Skeleton width="35%" height={12} />
+                </View>
+              </View>
+            </View>
+          ))}
+        </View>
       ) : items.length === 0 ? (
         <Text style={styles.emptyText}>{t('history.empty')}</Text>
       ) : (
