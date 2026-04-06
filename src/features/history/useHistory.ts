@@ -8,6 +8,7 @@ import {
 } from './historyRepository';
 import { exportHistoryItemToDevice } from './exportHistoryItem';
 import { mergePdfFilesToAppFolder } from './mergePdfService';
+import { t } from '../../i18n';
 
 export function useHistory() {
   const [items, setItems] = useState<HistoryItem[]>([]);
@@ -48,11 +49,11 @@ export function useHistory() {
   const mergePdfsAndExport = useCallback(
     async (pdfItems: HistoryItem[], outputBaseName: string) => {
       if (pdfItems.length < 2) {
-        throw new Error('Selecione pelo menos 2 PDFs para juntar.');
+        throw new Error(t('history.mergeNeedAtLeastTwo'));
       }
       const hasNonPdf = pdfItems.some(i => i.format !== 'PDF');
       if (hasNonPdf) {
-        throw new Error('Por enquanto, junte apenas PDFs.');
+        throw new Error(t('history.mergePdfOnly'));
       }
 
       const { baseName, mergedPdfPath } = await mergePdfFilesToAppFolder({
@@ -62,7 +63,6 @@ export function useHistory() {
 
       const fileName = `${baseName}.pdf`;
 
-      // exporta usando sua lógica existente
       const tempItem: HistoryItem = {
         id: 'temp',
         createdAt: Date.now(),
@@ -85,8 +85,8 @@ export function useHistory() {
       await refresh();
 
       const message = exportResult.exportedPath
-        ? 'PDF unificado salvo no app e exportado para Downloads.'
-        : 'PDF unificado salvo no app. (Falhou exportar para Downloads.)';
+        ? t('history.mergedExported')
+        : t('history.mergedSavedOnly');
 
       return { ...exportResult, message };
     },

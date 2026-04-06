@@ -1,4 +1,3 @@
-// src/screens/Scan/ScanScreen.tsx
 import React, { useCallback, useEffect } from 'react';
 import {
   Alert,
@@ -26,6 +25,7 @@ import {
   loadInterstitial,
   showInterstitialIfReady,
 } from '../../ads/interstitial';
+import { t } from '../../i18n';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Scan'>;
 
@@ -45,7 +45,7 @@ async function ensureCameraPermission() {
 
   if (granted === PermissionsAndroid.RESULTS.GRANTED) return true;
 
-  Alert.alert('Permissão', 'Permita acesso à câmera para escanear.');
+  Alert.alert(t('common.permission'), t('scan.permissionMessage'));
   return false;
 }
 
@@ -75,15 +75,15 @@ export function ScanScreen({ navigation }: Props) {
       const imageUri = normalizeUri(scannedImages[0]);
       navigation.replace('Preview', { imageUri });
     } catch {
-      Alert.alert('Erro', 'Falha ao abrir o scanner.');
+      Alert.alert(t('common.error'), t('scan.startError'));
     }
   }, [navigation]);
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <AppHeader
-        title="Escanear documento"
-        leftActionLabel="Voltar"
+        title={t('scan.headerTitle')}
+        leftActionLabel={t('common.back')}
         onLeftActionPress={() => navigation.goBack()}
       />
 
@@ -95,50 +95,35 @@ export function ScanScreen({ navigation }: Props) {
         ]}
       >
         <View style={styles.card}>
-          <Text style={styles.title}>Pronto para escanear</Text>
+          <Text style={styles.title}>{t('scan.readyTitle')}</Text>
 
-          <Text style={styles.subtitle}>
-            Posicione o documento dentro da câmera. O app detecta as bordas e
-            recorta automaticamente.
-          </Text>
+          <Text style={styles.subtitle}>{t('scan.subtitle')}</Text>
 
           <View style={styles.tipBox}>
-            <Text style={styles.tipTitle}>Dica de qualidade</Text>
-            <Text style={styles.tipText}>
-              Ao posicionar a câmera no documento, recomenda-se deixar que o
-              próprio aplicativo tire a foto, assim vai sair um documento com
-              melhor qualidade.
-            </Text>
+            <Text style={styles.tipTitle}>{t('scan.tipTitle')}</Text>
+            <Text style={styles.tipText}>{t('scan.tipText')}</Text>
           </View>
 
           <View style={styles.steps}>
             <View style={styles.stepRow}>
               <View style={styles.stepDot} />
-              <Text style={styles.stepText}>
-                Mantenha o celular firme e o documento bem iluminado
-              </Text>
+              <Text style={styles.stepText}>{t('scan.step1')}</Text>
             </View>
 
             <View style={styles.stepRow}>
               <View style={styles.stepDot} />
-              <Text style={styles.stepText}>
-                Evite sombras e reflexos (principalmente em mesa brilhante)
-              </Text>
+              <Text style={styles.stepText}>{t('scan.step2')}</Text>
             </View>
 
             <View style={styles.stepRow}>
               <View style={styles.stepDot} />
-              <Text style={styles.stepText}>
-                Deixe o app capturar automaticamente
-              </Text>
+              <Text style={styles.stepText}>{t('scan.step3')}</Text>
             </View>
           </View>
 
           <View style={styles.actions}>
-            <PrimaryButton label="Iniciar scanner" onPress={startScan} />
-            <Text style={styles.helper}>
-              Você vai voltar para a prévia para escolher PDF ou JPEG.
-            </Text>
+            <PrimaryButton label={t('scan.startButton')} onPress={startScan} />
+            <Text style={styles.helper}>{t('scan.helper')}</Text>
           </View>
         </View>
       </ScrollView>

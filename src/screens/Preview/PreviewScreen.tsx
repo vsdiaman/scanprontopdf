@@ -25,6 +25,7 @@ import {
   SaveFormat,
 } from '../../services/scanSaveService';
 import { addHistoryItem } from '../../features/history/historyRepository';
+import { t } from '../../i18n';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Preview'>;
 
@@ -58,7 +59,8 @@ export function PreviewScreen({ navigation, route }: Props) {
   }, [safeBaseName, fileExtension]);
 
   const saveLabel = useMemo(() => {
-    return isSaving ? 'Salvando...' : `Salvar ${finalFileName}`;
+    if (isSaving) return t('common.saving');
+    return `${t('common.save')} ${finalFileName}`;
   }, [isSaving, finalFileName]);
 
   const openModal = (
@@ -91,12 +93,16 @@ export function PreviewScreen({ navigation, route }: Props) {
       });
 
       openModal(
-        'Salvo',
+        t('preview.modalSavedTitle'),
         buildSaveSuccessMessage(saveFormat, exportedPath),
         true,
       );
     } catch (error: any) {
-      openModal('Erro', error?.message || 'Erro ao salvar.', false);
+      openModal(
+        t('common.error'),
+        error?.message || t('preview.modalSaveErrorFallback'),
+        false,
+      );
     } finally {
       setIsSaving(false);
     }
@@ -105,8 +111,8 @@ export function PreviewScreen({ navigation, route }: Props) {
   return (
     <View style={styles.container}>
       <AppHeader
-        title="Pré-visualização"
-        leftActionLabel="Voltar"
+        title={t('preview.headerTitle')}
+        leftActionLabel={t('common.back')}
         onLeftActionPress={() => navigation.goBack()}
       />
 
@@ -129,7 +135,7 @@ export function PreviewScreen({ navigation, route }: Props) {
           </Card>
 
           <Card>
-            <Text style={styles.label}>Formato</Text>
+            <Text style={styles.label}>{t('preview.formatLabel')}</Text>
             <SegmentedControl
               value={saveFormat}
               options={['PDF', 'JPEG']}
@@ -137,11 +143,13 @@ export function PreviewScreen({ navigation, route }: Props) {
             />
 
             <Text style={[styles.label, { marginTop: spacing.lg }]}>
-              Nome do arquivo
+              {t('preview.fileNameLabel')}
             </Text>
 
             <View style={styles.previewNameRow}>
-              <Text style={styles.previewNameLabel}>Vai salvar como:</Text>
+              <Text style={styles.previewNameLabel}>
+                {t('preview.willSaveAs')}
+              </Text>
               <Text style={styles.previewNameValue} numberOfLines={1}>
                 {finalFileName}
               </Text>
@@ -150,7 +158,7 @@ export function PreviewScreen({ navigation, route }: Props) {
             <TextInput
               value={fileName}
               onChangeText={setFileName}
-              placeholder="Ex: contrato_2025"
+              placeholder={t('preview.placeholder')}
               placeholderTextColor={colors.mutedText}
               autoCapitalize="none"
               autoCorrect={false}
@@ -166,10 +174,7 @@ export function PreviewScreen({ navigation, route }: Props) {
               />
             </View>
 
-            <Text style={styles.hint}>
-              Dica: use nomes curtos (sem acentos). PDF/JPEG serão salvos no
-              aparelho.
-            </Text>
+            <Text style={styles.hint}>{t('preview.hint')}</Text>
           </Card>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -178,7 +183,7 @@ export function PreviewScreen({ navigation, route }: Props) {
         visible={isModalVisible}
         title={modalTitle}
         message={modalMessage}
-        confirmText="OK"
+        confirmText={t('common.ok')}
         onConfirm={() => {
           setIsModalVisible(false);
           if (shouldGoHomeAfterOk) navigation.popToTop();

@@ -1,6 +1,7 @@
 import RNFS from 'react-native-fs';
 import { PDFDocument } from 'pdf-lib';
 import { Buffer } from 'buffer';
+import { t } from '../../i18n';
 
 const APP_FOLDER = `${RNFS.DocumentDirectoryPath}/ScannerProntoPDF`;
 
@@ -22,13 +23,13 @@ function sanitizeBaseName(value: string) {
 }
 
 export async function mergePdfFilesToAppFolder(params: {
-  inputPdfPaths: string[]; // savedInAppPath de cada PDF
-  outputBaseName: string; // sem extensão
+  inputPdfPaths: string[];
+  outputBaseName: string;
 }) {
   const { inputPdfPaths, outputBaseName } = params;
 
   if (inputPdfPaths.length < 2) {
-    throw new Error('Selecione pelo menos 2 PDFs para juntar.');
+    throw new Error(t('history.mergeNeedAtLeastTwo'));
   }
 
   await ensureAppFolder();
@@ -46,7 +47,7 @@ export async function mergePdfFilesToAppFolder(params: {
 
     const exists = await RNFS.exists(pdfPath);
     if (!exists) {
-      throw new Error('Um dos PDFs selecionados não existe mais no app.');
+      throw new Error(t('history.mergeMissingPdf'));
     }
 
     const base64 = await RNFS.readFile(pdfPath, 'base64');

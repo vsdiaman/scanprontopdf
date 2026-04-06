@@ -1,20 +1,25 @@
-import { Image, Platform } from 'react-native';
+import { Platform } from 'react-native';
 import RNFS from 'react-native-fs';
 import ReactNativeBlobUtil from 'react-native-blob-util';
 import { CameraRoll } from '@react-native-camera-roll/camera-roll';
-import { generatePDF } from 'react-native-html-to-pdf';
+import { PDFDocument } from 'pdf-lib';
+import { Buffer } from 'buffer';
+import { t } from '../i18n';
 
 export type SaveFormat = 'PDF' | 'JPEG';
 
 type SaveInput = {
-  imageUri: string; // file://...
   fileName: string;
   format: SaveFormat;
+
+  imageUri?: string;
+  imageUris?: string[];
+  pdfUri?: string;
 };
 
 type SaveResult = {
-  savedInAppPath: string; // path local do app
-  exportedPath?: string; // URI pública (content://...) ou path
+  savedInAppPath: string;
+  exportedPath?: string;
 };
 
 const APP_FOLDER = `${RNFS.DocumentDirectoryPath}/ScannerProntoPDF`;
@@ -40,49 +45,45 @@ async function ensureAppFolder() {
   if (!exists) await RNFS.mkdir(APP_FOLDER);
 }
 
-function getImageSize(uri: string) {
-  return new Promise<{ width: number; height: number }>((resolve, reject) => {
-    Image.getSize(
-      uri,
-      (width, height) => resolve({ width, height }),
-      error => reject(error),
-    );
+function normalizeImageUris(imageUri?: string, imageUris?: string[]) {
+  const list = (imageUris ?? []).filter(Boolean);
+  if (imageUri) list.unshift(imageUri);
+
+  const seen = new Set<string>();
+  return list.filter(uri => {
+    if (seen.has(uri)) return false;
+    seen.add(uri);
+    return true;
   });
 }
 
-function fitIntoBox(
-  imageWidth: number,
-  imageHeight: number,
-  boxWidth: number,
-  boxHeight: number,
-) {
-  const imageRatio = imageWidth / imageHeight;
-  const boxRatio = boxWidth / boxHeight;
-
-  if (imageRatio > boxRatio) {
-    const width = boxWidth;
-    const height = Math.round(boxWidth / imageRatio);
-    return { width, height };
+async function readUriAsBase64(uri: string) {
+  if (uri.startsWith('content://')) {
+    return ReactNativeBlobUtil.fs.readFile(uri, 'base64');
   }
-
-  const height = boxHeight;
-  const width = Math.round(boxHeight * imageRatio);
-  return { width, height };
+  return RNFS.readFile(stripFileScheme(uri), 'base64');
 }
 
-async function saveJpegToAppFolder(sourceUri: string, safeName: string) {
-  const sourcePath = stripFileScheme(sourceUri);
-  const destinationPath = `${APP_FOLDER}/${safeName}.jpg`;
-
+async function copyUriToPath(sourceUri: string, destinationPath: string) {
   const alreadyExists = await RNFS.exists(destinationPath);
   if (alreadyExists) await RNFS.unlink(destinationPath);
 
-  await RNFS.copyFile(sourcePath, destinationPath);
+  if (sourceUri.startsWith('content://')) {
+    const base64 = await readUriAsBase64(sourceUri);
+    await RNFS.writeFile(destinationPath, base64, 'base64');
+    return;
+  }
+
+  await RNFS.copyFile(stripFileScheme(sourceUri), destinationPath);
+}
+
+async function saveJpegToAppFolder(sourceUri: string, safeName: string) {
+  const destinationPath = `${APP_FOLDER}/${safeName}.jpg`;
+  await copyUriToPath(sourceUri, destinationPath);
   return destinationPath;
 }
 
 async function exportJpegToGallery(appJpegPath: string) {
-  // CameraRoll já salva em MediaStore e cria álbum
   const galleryUri = await CameraRoll.save(withFileScheme(appJpegPath), {
     type: 'photo',
     album: GALLERY_ALBUM,
@@ -91,73 +92,70 @@ async function exportJpegToGallery(appJpegPath: string) {
   return galleryUri;
 }
 
-/**
- * PDF via HTML: gera no Documents e move pro APP_FOLDER.
- * Usa generatePDF (API atual).
- */
-async function savePdfToAppFolder(sourceUri: string, safeName: string) {
-  const sourcePath = stripFileScheme(sourceUri);
-  const imageUri = withFileScheme(sourcePath);
+function fitIntoBox(
+  imageWidth: number,
+  imageHeight: number,
+  boxWidth: number,
+  boxHeight: number,
+) {
+  const scale = Math.min(boxWidth / imageWidth, boxHeight / imageHeight);
+  const width = Math.floor(imageWidth * scale);
+  const height = Math.floor(imageHeight * scale);
+  return { width, height };
+}
 
-  // “A4” em px pro render do HTML->PDF (bom o suficiente pro MVP)
-  const pageWidth = 794;
-  const pageHeight = 1123;
+async function buildPdfFromImagesToAppFolder(
+  imageUris: string[],
+  safeName: string,
+) {
+  const pageWidth = 595;
+  const pageHeight = 842;
   const padding = 24;
 
-  const { width: imgW, height: imgH } = await getImageSize(imageUri);
   const boxW = pageWidth - padding * 2;
   const boxH = pageHeight - padding * 2;
 
-  const fitted = fitIntoBox(imgW, imgH, boxW, boxH);
+  const pdf = await PDFDocument.create();
 
-  const html = `
-    <html>
-      <head>
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-      </head>
-      <body style="margin:0; padding:0; width:${pageWidth}px; height:${pageHeight}px;">
-        <div style="
-          width:${pageWidth}px;
-          height:${pageHeight}px;
-          display:flex;
-          justify-content:center;
-          align-items:center;
-          padding:${padding}px;
-          box-sizing:border-box;
-        ">
-          <img
-            src="${imageUri}"
-            style="
-              width:${fitted.width}px;
-              height:${fitted.height}px;
-              object-fit:contain;
-            "
-          />
-        </div>
-      </body>
-    </html>
-  `;
+  for (const uri of imageUris) {
+    const base64 = await readUriAsBase64(uri);
+    const bytes = Buffer.from(base64, 'base64');
 
-  const result = await generatePDF({
-    html,
-    fileName: safeName,
-    base64: false,
-    directory: 'Documents',
-    width: pageWidth,
-    height: pageHeight,
-  });
+    let embedded: any;
+    try {
+      embedded = await pdf.embedJpg(bytes);
+    } catch {
+      embedded = await pdf.embedPng(bytes);
+    }
 
-  if (!result?.filePath) {
-    throw new Error('PDF generation failed');
+    const fitted = fitIntoBox(embedded.width, embedded.height, boxW, boxH);
+
+    const x = Math.floor((pageWidth - fitted.width) / 2);
+    const y = Math.floor((pageHeight - fitted.height) / 2);
+
+    const page = pdf.addPage([pageWidth, pageHeight]);
+    page.drawImage(embedded, {
+      x,
+      y,
+      width: fitted.width,
+      height: fitted.height,
+    });
   }
 
-  const generatedPdfPath = stripFileScheme(result.filePath);
+  const pdfBytes = await pdf.save();
+  const pdfBase64 = Buffer.from(pdfBytes).toString('base64');
+
   const finalPdfPath = `${APP_FOLDER}/${safeName}.pdf`;
+  const exists = await RNFS.exists(finalPdfPath);
+  if (exists) await RNFS.unlink(finalPdfPath);
 
-  const finalExists = await RNFS.exists(finalPdfPath);
-  if (finalExists) await RNFS.unlink(finalPdfPath);
+  await RNFS.writeFile(finalPdfPath, pdfBase64, 'base64');
+  return finalPdfPath;
+}
 
-  await RNFS.moveFile(generatedPdfPath, finalPdfPath);
+async function savePdfUriToAppFolder(pdfUri: string, safeName: string) {
+  const finalPdfPath = `${APP_FOLDER}/${safeName}.pdf`;
+  await copyUriToPath(pdfUri, finalPdfPath);
   return finalPdfPath;
 }
 
@@ -166,10 +164,8 @@ async function exportPdfToDownloads(appPdfPath: string, safeName: string) {
 
   const pdfPath = stripFileScheme(appPdfPath);
   const displayName = `${safeName}.pdf`;
-
   const apiLevel = typeof Platform.Version === 'number' ? Platform.Version : 0;
 
-  // Android 10+ (API 29+) — salva em Downloads via MediaStore
   if (apiLevel >= 29) {
     try {
       const mediaCollection = (ReactNativeBlobUtil as any)?.MediaCollection;
@@ -185,14 +181,13 @@ async function exportPdfToDownloads(appPdfPath: string, safeName: string) {
           pdfPath,
         );
 
-        return contentUri as string; // content://...
+        return contentUri as string;
       }
     } catch {
-      // cai pro fallback
+      // fallback
     }
   }
 
-  // Android 9 ou menor — tenta copiar pro /Download (precisa WRITE_EXTERNAL_STORAGE)
   const downloadsDir = RNFS.DownloadDirectoryPath;
   if (!downloadsDir) return undefined;
 
@@ -208,22 +203,35 @@ async function exportPdfToDownloads(appPdfPath: string, safeName: string) {
   }
 }
 
-export async function saveScanAndExport({
-  imageUri,
-  fileName,
-  format,
-}: SaveInput): Promise<SaveResult> {
+export async function saveScanAndExport(input: SaveInput): Promise<SaveResult> {
+  const { fileName, format, pdfUri } = input;
+
   await ensureAppFolder();
 
   const safeName = sanitizeFileName(fileName) || `scan_${Date.now()}`;
+  const imageUris = normalizeImageUris(input.imageUri, input.imageUris);
 
   if (format === 'JPEG') {
-    const savedInAppPath = await saveJpegToAppFolder(imageUri, safeName);
+    if (imageUris.length !== 1) {
+      throw new Error(t('save.jpegSinglePageOnly'));
+    }
+
+    const savedInAppPath = await saveJpegToAppFolder(imageUris[0], safeName);
     const exportedPath = await exportJpegToGallery(savedInAppPath);
     return { savedInAppPath, exportedPath };
   }
 
-  const savedInAppPath = await savePdfToAppFolder(imageUri, safeName);
+  let savedInAppPath: string;
+
+  if (pdfUri) {
+    savedInAppPath = await savePdfUriToAppFolder(pdfUri, safeName);
+  } else {
+    if (imageUris.length === 0) {
+      throw new Error(t('save.noImagesFromScanner'));
+    }
+    savedInAppPath = await buildPdfFromImagesToAppFolder(imageUris, safeName);
+  }
+
   const exportedPath = await exportPdfToDownloads(savedInAppPath, safeName);
   return { savedInAppPath, exportedPath };
 }
@@ -232,7 +240,7 @@ export function buildSaveSuccessMessage(
   format: SaveFormat,
   exportedPath?: string,
 ) {
-  if (format === 'JPEG') return 'JPEG salvo no app e na galeria.';
-  if (exportedPath) return 'PDF salvo no app e salvo em Downloads.';
-  return 'PDF salvo no app. (Falhou exportar para Downloads neste aparelho.)';
+  if (format === 'JPEG') return t('save.jpegSaved');
+  if (exportedPath) return t('save.pdfSavedAndExported');
+  return t('save.pdfSavedOnly');
 }

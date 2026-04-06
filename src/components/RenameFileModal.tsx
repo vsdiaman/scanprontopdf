@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { colors } from '../theme/colors';
 import { spacing } from '../theme/spacing';
+import { t } from '../i18n';
 
 type Props = {
   visible: boolean;
@@ -35,7 +36,6 @@ export function RenameFileModal({
   onConfirm,
 }: Props) {
   const [value, setValue] = useState(initialValue);
-
   const translateY = useRef(new Animated.Value(420)).current;
 
   useEffect(() => {
@@ -81,12 +81,12 @@ export function RenameFileModal({
         <Animated.View style={[styles.sheet, { transform: [{ translateY }] }]}>
           <View style={styles.handle} />
 
-          <Text style={styles.title}>Renomear</Text>
+          <Text style={styles.title}>{t('rename.title')}</Text>
 
           <TextInput
             value={value}
             onChangeText={setValue}
-            placeholder="Novo título"
+            placeholder={t('rename.placeholder')}
             placeholderTextColor={colors.mutedText}
             style={styles.input}
             autoFocus
@@ -100,7 +100,7 @@ export function RenameFileModal({
               style={[styles.button, styles.buttonGhost]}
             >
               <Text style={[styles.buttonText, styles.buttonTextGhost]}>
-                Cancelar
+                {t('rename.cancel')}
               </Text>
             </Pressable>
 
@@ -109,7 +109,7 @@ export function RenameFileModal({
               disabled={!canSave}
               style={[styles.button, !canSave && styles.buttonDisabled]}
             >
-              <Text style={styles.buttonText}>Salvar</Text>
+              <Text style={styles.buttonText}>{t('rename.save')}</Text>
             </Pressable>
           </View>
         </Animated.View>

@@ -15,6 +15,7 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RootStackParamList } from '../../navigation/types';
 import { onboardingSteps } from './onboardingSteps';
+import { t } from '../../i18n';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'OnboardingStep'>;
 
@@ -101,7 +102,9 @@ export function OnboardingStepScreen({ navigation, route }: Props) {
     }),
   ).current;
 
-  const buttonLabel = isLastStep ? 'Começar' : 'Próximo';
+  const buttonLabel = isLastStep
+    ? t('onboarding.buttonStart')
+    : t('onboarding.buttonNext');
 
   return (
     <View style={styles.container}>
@@ -116,12 +119,8 @@ export function OnboardingStepScreen({ navigation, route }: Props) {
           ]}
         >
           <View style={styles.textBox}>
-            <Text
-              style={styles.title}
-              // numberOfLines={3}
-              allowFontScaling={false}
-            >
-              {step.title}
+            <Text style={styles.title} allowFontScaling={false}>
+              {t(step.titleKey)}
             </Text>
 
             <Text
@@ -129,7 +128,7 @@ export function OnboardingStepScreen({ navigation, route }: Props) {
               numberOfLines={3}
               allowFontScaling={false}
             >
-              {step.description}
+              {t(step.descriptionKey)}
             </Text>
           </View>
 
@@ -152,7 +151,6 @@ export function OnboardingStepScreen({ navigation, route }: Props) {
         </Animated.View>
       </View>
 
-      {/* BOTÃO FIXO NO FUNDO */}
       <View style={[styles.fixedFooter, { paddingBottom: 12 + insets.bottom }]}>
         <TouchableOpacity
           activeOpacity={0.85}
@@ -174,7 +172,7 @@ const styles = StyleSheet.create({
   body: {
     flex: 1,
     paddingTop: 34,
-    paddingBottom: 110, // espaço reservado pro footer fixo
+    paddingBottom: 110,
   },
 
   animatedPage: {
@@ -228,7 +226,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     paddingHorizontal: 12,
     paddingTop: 10,
-    backgroundColor: UI.back, // mantém igual ao fundo
+    backgroundColor: UI.back,
   },
 
   button: {
