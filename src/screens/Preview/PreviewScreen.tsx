@@ -1,7 +1,8 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Image,
   KeyboardAvoidingView,
+  PermissionsAndroid,
   Platform,
   ScrollView,
   StyleSheet,
@@ -37,7 +38,7 @@ function sanitizeFileName(rawName: string) {
 }
 
 export function PreviewScreen({ navigation, route }: Props) {
-  const { imageUri } = route.params;
+  const { imageUri, imageUris } = route.params;
 
   const [saveFormat, setSaveFormat] = useState<SaveFormat>('PDF');
   const [fileName, setFileName] = useState('scan_001');
@@ -47,6 +48,15 @@ export function PreviewScreen({ navigation, route }: Props) {
   const [modalTitle, setModalTitle] = useState('');
   const [modalMessage, setModalMessage] = useState('');
   const [shouldGoHomeAfterOk, setShouldGoHomeAfterOk] = useState(false);
+  const isMountedRef = useRef(true);
+  const isSavingRef = useRef(false);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   const fileExtension = saveFormat === 'PDF' ? '.pdf' : '.jpg';
 
@@ -68,19 +78,73 @@ export function PreviewScreen({ navigation, route }: Props) {
     message: string,
     goHomeAfterOk: boolean,
   ) => {
+    if (!isMountedRef.current) return;
     setModalTitle(title);
     setModalMessage(message);
     setShouldGoHomeAfterOk(goHomeAfterOk);
     setIsModalVisible(true);
   };
 
-  const onSave = async () => {
-    if (isSaving) return;
+  const requestAndroidPermission = async (permission: string) => {
+    try {
+      const alreadyGranted = await PermissionsAndroid.check(permission as any);
+      if (alreadyGranted) return true;
 
+      const result = await PermissionsAndroid.request(permission as any);
+      return result === PermissionsAndroid.RESULTS.GRANTED;
+    } catch {
+      return false;
+    }
+  };
+
+  const ensureExportPermission = async (format: SaveFormat) => {
+    if (Platform.OS !== 'android') return true;
+
+    if (format === 'JPEG') {
+      if (Platform.Version >= 33) {
+        return requestAndroidPermission('android.permission.READ_MEDIA_IMAGES');
+      }
+
+      if (Platform.Version <= 28) {
+        return requestAndroidPermission(
+          'android.permission.WRITE_EXTERNAL_STORAGE',
+        );
+      }
+    }
+
+    if (format === 'PDF' && Platform.Version <= 28) {
+      return requestAndroidPermission(
+        'android.permission.WRITE_EXTERNAL_STORAGE',
+      );
+    }
+
+    return true;
+  };
+
+  const onSave = async () => {
+    if (isSavingRef.current || isSaving) return;
+
+    const pages = (imageUris?.length ? imageUris : [imageUri]).filter(Boolean);
+    if (pages.length === 0) {
+      openModal(t('common.error'), t('save.noImagesFromScanner'), false);
+      return;
+    }
+
+    isSavingRef.current = true;
     setIsSaving(true);
     try {
+      const permissionOk = await ensureExportPermission(saveFormat);
+      if (!permissionOk && Platform.OS === 'android') {
+        throw new Error(
+          saveFormat === 'JPEG'
+            ? t('export.permissionDeniedGallery')
+            : t('export.permissionDeniedDownloads'),
+        );
+      }
+
       const { savedInAppPath, exportedPath } = await saveScanAndExport({
         imageUri,
+        imageUris: pages,
         fileName: safeBaseName,
         format: saveFormat,
       });
@@ -98,13 +162,18 @@ export function PreviewScreen({ navigation, route }: Props) {
         true,
       );
     } catch (error: any) {
+      console.error('[PreviewScreen] save failed', {
+        error,
+        format: saveFormat,
+      });
       openModal(
         t('common.error'),
         error?.message || t('preview.modalSaveErrorFallback'),
         false,
       );
     } finally {
-      setIsSaving(false);
+      isSavingRef.current = false;
+      if (isMountedRef.current) setIsSaving(false);
     }
   };
 

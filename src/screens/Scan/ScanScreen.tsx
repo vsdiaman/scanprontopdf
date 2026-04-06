@@ -37,6 +37,20 @@ function normalizeUri(path: string) {
   return `file://${path}`;
 }
 
+function normalizeScanResultUris(scannedImages?: string[]) {
+  if (!Array.isArray(scannedImages)) return [];
+  const seen = new Set<string>();
+
+  return scannedImages
+    .filter(Boolean)
+    .map(imagePath => normalizeUri(String(imagePath)))
+    .filter(uri => {
+      if (seen.has(uri)) return false;
+      seen.add(uri);
+      return true;
+    });
+}
+
 async function ensureCameraPermission() {
   if (Platform.OS !== 'android') return true;
 
@@ -93,16 +107,20 @@ export function ScanScreen({ navigation }: Props) {
         croppedImageQuality: 90,
       });
 
-      if (status !== 'success' || !scannedImages?.length) {
+      const normalizedUris = normalizeScanResultUris(scannedImages);
+      if (status !== 'success' || normalizedUris.length === 0) {
         if (isMountedRef.current) navigation.goBack();
         return;
       }
 
-      const imageUri = normalizeUri(scannedImages[0]);
+      const imageUri = normalizedUris[0];
 
       if (!hasNavigatedRef.current && isMountedRef.current) {
         hasNavigatedRef.current = true;
-        navigation.replace('Preview', { imageUri });
+        navigation.replace('Preview', {
+          imageUri,
+          imageUris: normalizedUris,
+        });
       }
 
       safeShowAd();

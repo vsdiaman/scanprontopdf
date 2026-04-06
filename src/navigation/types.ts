@@ -3,5 +3,5 @@ export type RootStackParamList = {
   OnboardingStep: { stepIndex: number };
   Home: undefined;
   Scan: undefined;
-  Preview: { imageUri: string };
+  Preview: { imageUri: string; imageUris?: string[] };
 };
