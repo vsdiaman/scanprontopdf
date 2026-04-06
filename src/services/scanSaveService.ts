@@ -20,6 +20,7 @@ type SaveInput = {
 type SaveResult = {
   savedInAppPath: string;
   exportedPath?: string;
+  exportFailed?: boolean;
 };
 
 const APP_FOLDER = `${RNFS.DocumentDirectoryPath}/ScannerProntoPDF`;
@@ -254,8 +255,12 @@ export async function saveScanAndExport(input: SaveInput): Promise<SaveResult> {
       }
 
       const savedInAppPath = await saveJpegToAppFolder(imageUris[0], safeName);
-      const exportedPath = await exportJpegToGallery(savedInAppPath);
-      return { savedInAppPath, exportedPath };
+      try {
+        const exportedPath = await exportJpegToGallery(savedInAppPath);
+        return { savedInAppPath, exportedPath };
+      } catch {
+        return { savedInAppPath, exportFailed: true };
+      }
     }
 
     let savedInAppPath: string;
@@ -287,7 +292,9 @@ export function buildSaveSuccessMessage(
   format: SaveFormat,
   exportedPath?: string,
 ) {
-  if (format === 'JPEG') return t('save.jpegSaved');
+  if (format === 'JPEG') {
+    return exportedPath ? t('save.jpegSaved') : t('save.jpegSavedOnly');
+  }
   if (exportedPath) return t('save.pdfSavedAndExported');
   return t('save.pdfSavedOnly');
 }

@@ -240,6 +240,7 @@ export function PreviewScreen({ navigation, route }: Props) {
                 label={saveLabel}
                 onPress={onSave}
                 disabled={isSaving}
+                loading={isSaving}
               />
             </View>
 

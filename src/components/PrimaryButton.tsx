@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pressable, StyleSheet, Text } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { colors } from '../theme/colors';
 import { spacing } from '../theme/spacing';
 
@@ -7,20 +7,30 @@ type Props = {
   label: string;
   onPress: () => void;
   disabled?: boolean;
+  loading?: boolean;
 };
 
-export function PrimaryButton({ label, onPress, disabled }: Props) {
+export function PrimaryButton({ label, onPress, disabled, loading }: Props) {
   return (
     <Pressable
       onPress={onPress}
-      disabled={disabled}
+      disabled={disabled || loading}
       style={({ pressed }) => [
         styles.button,
-        pressed && !disabled ? styles.pressed : null,
-        disabled ? styles.disabled : null,
+        pressed && !disabled && !loading ? styles.pressed : null,
+        (disabled || loading) ? styles.disabled : null,
       ]}
     >
-      <Text style={styles.text}>{label}</Text>
+      <View style={styles.content}>
+        {loading ? (
+          <ActivityIndicator
+            color={colors.primaryText}
+            size="small"
+            style={styles.indicator}
+          />
+        ) : null}
+        <Text style={styles.text}>{label}</Text>
+      </View>
     </Pressable>
   );
 }
@@ -33,6 +43,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: spacing.lg,
+  },
+  content: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  indicator: {
+    marginRight: spacing.sm,
   },
   text: { color: colors.primaryText, fontSize: 14, fontWeight: '900' },
   pressed: { opacity: 0.92 },
