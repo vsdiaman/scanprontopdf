@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   Image,
@@ -25,6 +25,7 @@ import {
   SaveFormat,
   saveScanAndExport,
 } from '../../../services/scanSaveService';
+import { generateDefaultFileId } from '../../../utils/generateDefaultFileId';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Preview'>;
 
@@ -82,13 +83,18 @@ export function PreviewScreen({ navigation, route }: Props) {
   const imageUri = route.params.imageUri;
 
   const [saveFormat, setSaveFormat] = useState<SaveFormat>('JPEG');
-  const [fileName, setFileName] = useState('scan_001');
+  const [fileName, setFileName] = useState(() => generateDefaultFileId());
   const [isSaving, setIsSaving] = useState(false);
 
   const fileExtension = saveFormat === 'PDF' ? '.pdf' : '.jpg';
 
+
+  useEffect(() => {
+    setFileName(generateDefaultFileId());
+  }, [imageUri]);
+
   const saveLabel = useMemo(() => {
-    const safeName = fileName.trim() || 'scan';
+    const safeName = fileName.trim() || generateDefaultFileId();
     return isSaving ? 'Salvando...' : `Salvar ${safeName}${fileExtension}`;
   }, [fileName, fileExtension, isSaving]);
 
@@ -108,7 +114,7 @@ export function PreviewScreen({ navigation, route }: Props) {
     }
 
     try {
-      const safeBaseName = sanitizeFileName(fileName) || `scan_${Date.now()}`;
+      const safeBaseName = sanitizeFileName(fileName) || generateDefaultFileId();
       const finalFileName = `${safeBaseName}${fileExtension}`;
 
       const { savedInAppPath, exportedPath } = await saveScanAndExport({

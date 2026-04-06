@@ -5,6 +5,7 @@ import { CameraRoll } from '@react-native-camera-roll/camera-roll';
 import { PDFDocument } from 'pdf-lib';
 import { Buffer } from 'buffer';
 import { t } from '../i18n';
+import { generateDefaultFileId } from '../utils/generateDefaultFileId';
 
 export type SaveFormat = 'PDF' | 'JPEG';
 
@@ -290,7 +291,7 @@ export async function saveScanAndExport(input: SaveInput): Promise<SaveResult> {
   try {
     await ensureAppFolder();
 
-    const safeName = sanitizeFileName(fileName) || `scan_${Date.now()}`;
+    const safeName = sanitizeFileName(fileName) || generateDefaultFileId();
     const imageUris = normalizeImageUris(input.imageUri, input.imageUris);
 
     if (format === 'JPEG') {
