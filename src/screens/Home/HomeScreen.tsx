@@ -87,7 +87,9 @@ export function HomeScreen({ navigation }: any) {
           await RNFS.mkdir(folderPath);
         }
 
-        const fileName = `${Date.now()}_${file.name || t('home.importedDefaultFileName')}`;
+        const fileName = `${Date.now()}_${
+          file.name || t('home.importedDefaultFileName')
+        }`;
         const destinationPath = `${folderPath}/${fileName}`;
 
         const cleanSrc = file.uri.replace('file://', '');
@@ -142,7 +144,10 @@ export function HomeScreen({ navigation }: any) {
       await new Promise(resolve => setTimeout(resolve, 650));
       setSelectedIds([]);
       setIsMergeMode(false);
-      Alert.alert(t('common.success'), result.message || t('history.mergedSuccessAlert'));
+      Alert.alert(
+        t('common.success'),
+        result.message || t('history.mergedSuccessAlert'),
+      );
     } catch (err: any) {
       Alert.alert(t('common.error'), err.message);
     } finally {
@@ -175,7 +180,10 @@ export function HomeScreen({ navigation }: any) {
       try {
         await action();
       } catch (error: any) {
-        Alert.alert(t('common.error'), error?.message || t('preview.modalSaveErrorFallback'));
+        Alert.alert(
+          t('common.error'),
+          error?.message || t('preview.modalSaveErrorFallback'),
+        );
       }
     },
     [closeActionMenu],
@@ -185,7 +193,10 @@ export function HomeScreen({ navigation }: any) {
     if (!activeItem) return;
     runItemAction(async () => {
       const result = await exportToDevice(activeItem);
-      Alert.alert(t('common.success'), result.message || t('history.exportFail'));
+      Alert.alert(
+        t('common.success'),
+        result.message || t('history.exportFail'),
+      );
     });
   }, [activeItem, exportToDevice, runItemAction]);
 
@@ -222,7 +233,10 @@ export function HomeScreen({ navigation }: any) {
         await rename(activeItem, nextBaseName);
         setIsRenameVisible(false);
       } catch (error: any) {
-        Alert.alert(t('common.error'), error?.message || t('preview.modalSaveErrorFallback'));
+        Alert.alert(
+          t('common.error'),
+          error?.message || t('preview.modalSaveErrorFallback'),
+        );
       }
     },
     [activeItem, rename],
@@ -236,13 +250,16 @@ export function HomeScreen({ navigation }: any) {
       setIsDeleteVisible(false);
       setActiveItem(null);
     } catch (error: any) {
-      Alert.alert(t('common.error'), error?.message || t('preview.modalSaveErrorFallback'));
+      Alert.alert(
+        t('common.error'),
+        error?.message || t('preview.modalSaveErrorFallback'),
+      );
     }
   }, [activeItem, remove]);
 
   return (
     <View style={styles.container}>
-      <View style={[styles.headerWrap, { paddingTop: insets.top }]}> 
+      <View style={[styles.headerWrap, { paddingTop: insets.top }]}>
         <AppHeader
           title={t('home.headerTitle')}
           subtitle={t('home.headerSubtitle')}
@@ -265,7 +282,9 @@ export function HomeScreen({ navigation }: any) {
             <Icon name="file-upload-outline" size={32} color={colors.primary} />
           </View>
           <Text style={styles.uploadTitle}>{t('home.importPdfTitle')}</Text>
-          <Text style={styles.uploadSubtitle}>{t('home.importPdfSubtitle')}</Text>
+          <Text style={styles.uploadSubtitle}>
+            {t('home.importPdfSubtitle')}
+          </Text>
           {isImporting ? <Loading inline size="small" /> : null}
         </TouchableOpacity>
 
@@ -281,7 +300,8 @@ export function HomeScreen({ navigation }: any) {
           <TouchableOpacity
             style={[
               styles.mergeButton,
-              ((!isMergeMode || selectedIds.length < 2) || isMerging) && styles.buttonDisabled,
+              (!isMergeMode || selectedIds.length < 2 || isMerging) &&
+                styles.buttonDisabled,
             ]}
             onPress={handleMergeSelection}
             disabled={isMerging}
@@ -289,12 +309,18 @@ export function HomeScreen({ navigation }: any) {
             <Icon
               name="set-merge"
               size={24}
-              color={!isMergeMode || selectedIds.length < 2 || isMerging ? '#94A3B8' : '#1E293B'}
+              color={
+                !isMergeMode || selectedIds.length < 2 || isMerging
+                  ? '#94A3B8'
+                  : '#1E293B'
+              }
             />
             <Text
               style={[
                 styles.buttonText,
-                (!isMergeMode || selectedIds.length < 2 || isMerging) && { color: '#94A3B8' },
+                (!isMergeMode || selectedIds.length < 2 || isMerging) && {
+                  color: '#000000',
+                },
               ]}
             >
               {isMergeMode
@@ -332,19 +358,32 @@ export function HomeScreen({ navigation }: any) {
         <View style={styles.actionModalWrap}>
           <View style={styles.actionCard}>
             <Pressable style={styles.actionMenuItem} onPress={openRename}>
-              <Text style={styles.actionMenuText}>{t('history.renameAction')}</Text>
+              <Text style={styles.actionMenuText}>
+                {t('history.renameAction')}
+              </Text>
             </Pressable>
             <Pressable style={styles.actionMenuItem} onPress={handleShare}>
-              <Text style={styles.actionMenuText}>{t('history.shareAction')}</Text>
+              <Text style={styles.actionMenuText}>
+                {t('history.shareAction')}
+              </Text>
             </Pressable>
             <Pressable style={styles.actionMenuItem} onPress={handleExport}>
-              <Text style={styles.actionMenuText}>{t('history.exportAction')}</Text>
+              <Text style={styles.actionMenuText}>
+                {t('history.exportAction')}
+              </Text>
             </Pressable>
             <Pressable style={styles.actionMenuItem} onPress={handleDuplicate}>
-              <Text style={styles.actionMenuText}>{t('history.duplicateAction')}</Text>
+              <Text style={styles.actionMenuText}>
+                {t('history.duplicateAction')}
+              </Text>
             </Pressable>
-            <Pressable style={styles.actionMenuItem} onPress={openDeleteConfirm}>
-              <Text style={styles.actionMenuTextDanger}>{t('history.deleteAction')}</Text>
+            <Pressable
+              style={styles.actionMenuItem}
+              onPress={openDeleteConfirm}
+            >
+              <Text style={styles.actionMenuTextDanger}>
+                {t('history.deleteAction')}
+              </Text>
             </Pressable>
           </View>
         </View>
@@ -428,7 +467,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   buttonText: { fontWeight: '700', fontSize: 15, color: '#1E293B' },
-  buttonDisabled: { opacity: 0.4, borderColor: '#CBD5E1' },
+  buttonDisabled: { opacity: 0.6, borderColor: '#0073ff' },
   actionBackdrop: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(11,18,32,0.45)',
