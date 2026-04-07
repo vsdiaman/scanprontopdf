@@ -72,6 +72,14 @@ def enableProguardInReleaseBuilds = false
  */
 def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
 
+
+configurations.configureEach {
+    // Avoid accidentally resolving desktop/JVM-only PDF stacks on Android.
+    exclude group: "com.lowagie"
+    exclude group: "com.github.librepdf", module: "openpdf"
+    exclude group: "com.itextpdf", module: "itextpdf"
+}
+
 android {
     ndkVersion rootProject.ext.ndkVersion
     buildToolsVersion rootProject.ext.buildToolsVersion

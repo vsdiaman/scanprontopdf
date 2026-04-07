@@ -22,7 +22,8 @@ class PdfSecurityModule(reactContext: ReactApplicationContext) :
   @ReactMethod
   fun protectPdf(inputPath: String, outputPath: String, password: String, promise: Promise) {
     try {
-      if (password.isBlank()) {
+      val trimmedPassword = password.trim()
+      if (trimmedPassword.isEmpty()) {
         promise.reject("INVALID_PASSWORD", "Password cannot be empty")
         return
       }
@@ -34,9 +35,17 @@ class PdfSecurityModule(reactContext: ReactApplicationContext) :
       }
 
       val outputFile = File(outputPath)
+      if (sourceFile.absolutePath == outputFile.absolutePath) {
+        promise.reject("INVALID_OUTPUT_PATH", "Output path must be different from input path")
+        return
+      }
+
       outputFile.parentFile?.mkdirs()
-      if (outputFile.exists()) {
-        outputFile.delete()
+
+      // Save into a temp file first so the final output is only replaced after successful encryption.
+      val tempOutputFile = File(outputFile.parentFile ?: sourceFile.parentFile, "${outputFile.name}.tmp")
+      if (tempOutputFile.exists()) {
+        tempOutputFile.delete()
       }
 
       PDDocument.load(sourceFile).use { document ->
@@ -45,8 +54,8 @@ class PdfSecurityModule(reactContext: ReactApplicationContext) :
         }
 
         val protectionPolicy = StandardProtectionPolicy(
-          password,
-          password,
+          trimmedPassword,
+          trimmedPassword,
           accessPermission,
         ).apply {
           setEncryptionKeyLength(128)
@@ -54,7 +63,17 @@ class PdfSecurityModule(reactContext: ReactApplicationContext) :
         }
 
         document.protect(protectionPolicy)
-        document.save(outputFile)
+        document.save(tempOutputFile)
+      }
+
+      if (outputFile.exists() && !outputFile.delete()) {
+        promise.reject("OUTPUT_DELETE_FAILED", "Unable to replace existing output file")
+        return
+      }
+
+      if (!tempOutputFile.renameTo(outputFile)) {
+        promise.reject("OUTPUT_RENAME_FAILED", "Unable to move protected PDF to destination")
+        return
       }
 
       promise.resolve(outputFile.absolutePath)
