@@ -15,6 +15,7 @@ let interstitialAd: InterstitialAd | null = null;
 let isLoaded = false;
 let isShowing = false;
 let lastShownAt = 0;
+let isAttemptInProgress = false;
 
 function getInterstitialAd() {
   if (interstitialAd) return interstitialAd;
@@ -65,5 +66,27 @@ export async function showInterstitialIfReady() {
   } catch {
     isShowing = false;
     return false;
+  }
+}
+
+type ContinueFn = () => void | Promise<void>;
+
+export async function tryShowInterstitialAndContinue(
+  onContinue: ContinueFn,
+): Promise<void> {
+  if (isAttemptInProgress) {
+    await onContinue();
+    return;
+  }
+
+  isAttemptInProgress = true;
+
+  try {
+    await showInterstitialIfReady();
+  } catch {
+    // anúncio nunca pode quebrar o fluxo principal
+  } finally {
+    isAttemptInProgress = false;
+    await onContinue();
   }
 }

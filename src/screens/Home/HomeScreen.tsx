@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import {
   StyleSheet,
   View,
@@ -30,6 +30,10 @@ import { RenameFileModal } from '../../components/RenameFileModal';
 import { ConfirmDeleteModal } from '../../components/ConfirmDeleteModal';
 import { MergeProgressOverlay } from '../../components/MergeProgressOverlay';
 import { PdfPasswordModal } from '../../components/PdfPasswordModal';
+import {
+  loadInterstitial,
+  tryShowInterstitialAndContinue,
+} from '../../ads/interstitial';
 
 export function HomeScreen({ navigation }: any) {
   const insets = useSafeAreaInsets();
@@ -60,8 +64,23 @@ export function HomeScreen({ navigation }: any) {
   const [isDeleteVisible, setIsDeleteVisible] = useState(false);
   const [isPasswordModalVisible, setIsPasswordModalVisible] = useState(false);
   const [passwordModalMode, setPasswordModalMode] = useState<'export' | 'protect'>('protect');
+  const isMountedRef = useRef(true);
 
-  const handleStartScan = () => navigation.navigate('Scan');
+  useEffect(() => {
+    isMountedRef.current = true;
+    loadInterstitial();
+
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  const handleStartScan = useCallback(() => {
+    tryShowInterstitialAndContinue(() => {
+      if (!isMountedRef.current) return;
+      navigation.navigate('Scan');
+    });
+  }, [navigation]);
 
   useFocusEffect(
     useCallback(() => {
@@ -167,8 +186,11 @@ export function HomeScreen({ navigation }: any) {
   }, []);
 
   const openActionMenu = useCallback((item: HistoryItem) => {
-    setActiveItem(item);
-    setIsActionMenuVisible(true);
+    tryShowInterstitialAndContinue(() => {
+      if (!isMountedRef.current) return;
+      setActiveItem(item);
+      setIsActionMenuVisible(true);
+    });
   }, []);
 
   const activeBaseName = useMemo(() => {
