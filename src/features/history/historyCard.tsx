@@ -16,8 +16,8 @@ interface HistoryCardProps {
   onOpenActions: (item: HistoryItem) => void;
   externalSelectedIds: string[];
   onSelectionChange: (ids: string[]) => void;
-  isSelectionEnabled: boolean;
-  onToggleSelectionMode: (enabled: boolean) => void;
+  isMergeMode: boolean;
+  onMergeModeChange: (enabled: boolean) => void;
 }
 
 export function HistoryCard({
@@ -26,18 +26,18 @@ export function HistoryCard({
   onOpenActions,
   externalSelectedIds,
   onSelectionChange,
-  isSelectionEnabled,
-  onToggleSelectionMode,
+  isMergeMode,
+  onMergeModeChange,
 }: HistoryCardProps) {
   const toggleItem = (id: string) => {
-    if (!isSelectionEnabled) onToggleSelectionMode(true);
+    if (!isMergeMode) return;
 
     const newSelection = externalSelectedIds.includes(id)
       ? externalSelectedIds.filter(item => item !== id)
       : [...externalSelectedIds, id];
 
     onSelectionChange(newSelection);
-    if (newSelection.length === 0) onToggleSelectionMode(false);
+    if (newSelection.length === 0) onMergeModeChange(false);
   };
 
   const renderItem = (item: HistoryItem) => {
@@ -46,8 +46,7 @@ export function HistoryCard({
     return (
       <Pressable
         key={item.id}
-        onPress={() => (isSelectionEnabled ? toggleItem(item.id) : null)}
-        onLongPress={() => toggleItem(item.id)}
+        onPress={() => (isMergeMode ? toggleItem(item.id) : undefined)}
         style={[styles.itemCard, isSelected && styles.itemSelected]}
       >
         <View style={styles.itemContent}>
@@ -68,7 +67,7 @@ export function HistoryCard({
             </Text>
           </View>
 
-          {!isSelectionEnabled && (
+          {!isMergeMode && (
             <Pressable
               style={styles.moreButton}
               onPress={() => onOpenActions(item)}
@@ -85,11 +84,11 @@ export function HistoryCard({
     <View style={styles.container}>
       <View style={styles.listHeader}>
         <Text style={styles.sectionTitle}>{t('history.recentDocsTitle')}</Text>
-        {isSelectionEnabled && (
+        {isMergeMode && (
           <Pressable
             onPress={() => {
               onSelectionChange([]);
-              onToggleSelectionMode(false);
+              onMergeModeChange(false);
             }}
           >
             <Text style={styles.cancelText}>{t('history.cancel')}</Text>

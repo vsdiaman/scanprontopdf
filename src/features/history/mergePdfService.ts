@@ -25,14 +25,21 @@ function sanitizeBaseName(value: string) {
 export async function mergePdfFilesToAppFolder(params: {
   inputPdfPaths: string[];
   outputBaseName: string;
+  onProgress?: (progress: number, status: string) => void;
 }) {
-  const { inputPdfPaths, outputBaseName } = params;
+  const { inputPdfPaths, outputBaseName, onProgress } = params;
+
+  const notifyProgress = (progress: number, status: string) => {
+    onProgress?.(Math.max(0, Math.min(100, Math.round(progress))), status);
+  };
 
   if (inputPdfPaths.length < 2) {
     throw new Error(t('history.mergeNeedAtLeastTwo'));
   }
+  notifyProgress(5, t('history.mergeProgressValidating'));
 
   await ensureAppFolder();
+  notifyProgress(12, t('history.mergeProgressPreparing'));
 
   const baseName = sanitizeBaseName(outputBaseName) || `merge_${Date.now()}`;
   const mergedPdfPath = `${APP_FOLDER}/${baseName}.pdf`;
@@ -41,8 +48,9 @@ export async function mergePdfFilesToAppFolder(params: {
   if (alreadyExists) await RNFS.unlink(mergedPdfPath);
 
   const mergedDoc = await PDFDocument.create();
+  notifyProgress(20, t('history.mergeProgressReading'));
 
-  for (const rawPath of inputPdfPaths) {
+  for (const [index, rawPath] of inputPdfPaths.entries()) {
     const pdfPath = stripFileScheme(rawPath);
 
     const exists = await RNFS.exists(pdfPath);
@@ -56,12 +64,17 @@ export async function mergePdfFilesToAppFolder(params: {
     const srcDoc = await PDFDocument.load(bytes);
     const pages = await mergedDoc.copyPages(srcDoc, srcDoc.getPageIndices());
     for (const page of pages) mergedDoc.addPage(page);
+
+    const ratio = (index + 1) / inputPdfPaths.length;
+    notifyProgress(20 + ratio * 55, t('history.mergeProgressMerging'));
   }
 
+  notifyProgress(80, t('history.mergeProgressWriting'));
   const mergedBytes = await mergedDoc.save();
   const mergedBase64 = Buffer.from(mergedBytes).toString('base64');
 
   await RNFS.writeFile(mergedPdfPath, mergedBase64, 'base64');
+  notifyProgress(90, t('history.mergeProgressFinalizing'));
 
   return { baseName, mergedPdfPath };
 }

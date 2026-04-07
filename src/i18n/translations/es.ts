@@ -39,6 +39,7 @@ export default {
     importPdfSubtitle: 'Elige un archivo de tu celular',
     scanButton: 'Escanear',
     mergeButton: 'Combinar (%{count})',
+    mergeEnterSelection: 'Seleccionar PDFs',
     importedDefaultName: 'Importado',
     importedDefaultFileName: 'documento.pdf',
     importErrorLog: 'Error al importar PDF:',
@@ -112,6 +113,14 @@ export default {
     mergedSavedOnly:
       'PDF combinado guardado en la app. (Falló la exportación a Descargas.)',
     mergedSuccessAlert: 'PDFs combinados correctamente.',
+    mergeProgressTitle: 'Combinando PDFs',
+    mergeProgressValidating: 'Validando archivos seleccionados...',
+    mergeProgressPreparing: 'Preparando documentos...',
+    mergeProgressReading: 'Leyendo PDFs...',
+    mergeProgressMerging: 'Procesando combinación...',
+    mergeProgressWriting: 'Guardando archivo final...',
+    mergeProgressFinalizing: 'Actualizando historial...',
+    mergeProgressDone: '¡Combinación completada!',
 
     renameAction: 'Renombrar',
     shareAction: 'Compartir',
