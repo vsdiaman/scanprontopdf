@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useRef } from 'react';
 import {
   Alert,
-  InteractionManager,
   PermissionsAndroid,
   Platform,
   ScrollView,
@@ -22,10 +21,6 @@ import { PrimaryButton } from '../../components/PrimaryButton';
 import { BannerBottom } from '../../components/BannerBottom';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
-import {
-  loadInterstitial,
-  showInterstitialIfReady,
-} from '../../ads/interstitial';
 import { t } from '../../i18n';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Scan'>;
@@ -70,28 +65,13 @@ export function ScanScreen({ navigation }: Props) {
   const isMountedRef = useRef(true);
   const isProcessingRef = useRef(false);
   const hasNavigatedRef = useRef(false);
-  const hasShownAdRef = useRef(false);
 
   useEffect(() => {
     isMountedRef.current = true;
-    loadInterstitial();
 
     return () => {
       isMountedRef.current = false;
     };
-  }, []);
-
-  const safeShowAd = useCallback(() => {
-    if (hasShownAdRef.current) return;
-
-    hasShownAdRef.current = true;
-    InteractionManager.runAfterInteractions(() => {
-      setTimeout(() => {
-        showInterstitialIfReady().catch(() => {
-          // anúncio não pode quebrar fluxo
-        });
-      }, 200);
-    });
   }, []);
 
   const startScan = useCallback(async () => {
@@ -122,8 +102,6 @@ export function ScanScreen({ navigation }: Props) {
           imageUris: normalizedUris,
         });
       }
-
-      safeShowAd();
     } catch {
       if (isMountedRef.current) {
         Alert.alert(t('common.error'), t('scan.startError'));
@@ -131,7 +109,7 @@ export function ScanScreen({ navigation }: Props) {
     } finally {
       isProcessingRef.current = false;
     }
-  }, [navigation, safeShowAd]);
+  }, [navigation]);
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
