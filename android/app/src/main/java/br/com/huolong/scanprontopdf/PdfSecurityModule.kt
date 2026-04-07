@@ -4,14 +4,18 @@ import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
-import com.lowagie.text.pdf.PdfReader
-import com.lowagie.text.pdf.PdfStamper
-import com.lowagie.text.pdf.PdfWriter
+import com.tom_roush.pdfbox.android.PDFBoxResourceLoader
+import com.tom_roush.pdfbox.pdmodel.PDDocument
+import com.tom_roush.pdfbox.pdmodel.encryption.AccessPermission
+import com.tom_roush.pdfbox.pdmodel.encryption.StandardProtectionPolicy
 import java.io.File
-import java.io.FileOutputStream
 
 class PdfSecurityModule(reactContext: ReactApplicationContext) :
   ReactContextBaseJavaModule(reactContext) {
+
+  init {
+    PDFBoxResourceLoader.init(reactApplicationContext)
+  }
 
   override fun getName(): String = "PdfSecurityModule"
 
@@ -35,22 +39,23 @@ class PdfSecurityModule(reactContext: ReactApplicationContext) :
         outputFile.delete()
       }
 
-      val reader = PdfReader(inputPath)
-      val stream = FileOutputStream(outputFile)
-      val stamper = PdfStamper(reader, stream)
+      PDDocument.load(sourceFile).use { document ->
+        val accessPermission = AccessPermission().apply {
+          setCanPrint(true)
+        }
 
-      val passwordBytes = password.toByteArray(Charsets.UTF_8)
+        val protectionPolicy = StandardProtectionPolicy(
+          password,
+          password,
+          accessPermission,
+        ).apply {
+          setEncryptionKeyLength(128)
+          setPermissions(accessPermission)
+        }
 
-      stamper.setEncryption(
-        passwordBytes,
-        passwordBytes,
-        PdfWriter.ALLOW_PRINTING,
-        PdfWriter.ENCRYPTION_AES_128,
-      )
-
-      stamper.close()
-      reader.close()
-      stream.close()
+        document.protect(protectionPolicy)
+        document.save(outputFile)
+      }
 
       promise.resolve(outputFile.absolutePath)
     } catch (error: Exception) {
