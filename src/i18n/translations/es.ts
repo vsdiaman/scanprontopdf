@@ -126,6 +126,7 @@ export default {
     shareAction: 'Compartir',
     exportAction: 'Exportar / Guardar en el dispositivo',
     duplicateAction: 'Duplicar',
+    protectAction: 'Proteger con contraseña',
     deleteAction: 'Eliminar',
     duplicateSuccess: 'Archivo duplicado correctamente.',
     duplicateFailed: 'No se pudo duplicar el archivo.',
@@ -162,5 +163,23 @@ export default {
     pdfSavedAndExported: 'PDF guardado en la app y exportado a Descargas.',
     pdfSavedOnly:
       'PDF guardado en la app. (Falló la exportación a Descargas.)',
+  },
+
+  pdfProtection: {
+    exportTitle: 'Exportar PDF',
+    protectTitle: 'Proteger PDF con contraseña',
+    enableToggle: 'Proteger con contraseña',
+    passwordPlaceholder: 'Contraseña',
+    confirmPlaceholder: 'Confirmar contraseña',
+    passwordHint: 'La contraseña debe tener al menos %{min} caracteres.',
+    disabledHint: 'Sin protección por contraseña, la exportación sigue normal.',
+    passwordRequired: 'La contraseña es obligatoria.',
+    confirmRequired: 'La confirmación de contraseña es obligatoria.',
+    passwordMismatch: 'Las contraseñas no coinciden.',
+    passwordMinLength: 'La contraseña debe tener al menos %{min} caracteres.',
+    notSupportedOnDevice: 'La protección por contraseña no está disponible en este dispositivo.',
+    failedToCreate: 'No se pudo crear el PDF protegido.',
+    protectSuccess: 'Copia protegida creada con éxito.',
+    onlyPdfSupported: 'La protección por contraseña está disponible solo para PDF.',
   },
 };

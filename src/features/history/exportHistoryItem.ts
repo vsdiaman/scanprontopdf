@@ -4,6 +4,7 @@ import ReactNativeBlobUtil from 'react-native-blob-util';
 import { CameraRoll } from '@react-native-camera-roll/camera-roll';
 import { HistoryItem } from './historyTypes';
 import { t } from '../../i18n';
+import { protectPdfWithPassword } from './pdfPasswordService';
 
 const GALLERY_ALBUM = 'Scanner Pronto PDF';
 
@@ -41,7 +42,7 @@ function addUniqueSuffix(fileName: string) {
   if (dotIndex <= 0) return `${fileName}_${ts}`;
 
   const base = fileName.slice(0, dotIndex);
-  const ext = fileName.slice(dotIndex); // inclui o "."
+  const ext = fileName.slice(dotIndex);
   return `${base}_${ts}${ext}`;
 }
 
@@ -132,7 +133,24 @@ async function exportPdfLegacy(
 
 type ExportOptions = {
   exportBaseName?: string;
+  pdfPassword?: string;
 };
+
+async function createProtectedPdfForExport(
+  appPath: string,
+  displayName: string,
+  password: string,
+) {
+  const baseName = stripExt(displayName) || `pdf_${Date.now()}`;
+  const tempPath =
+    `${RNFS.CachesDirectoryPath}/${baseName}_protected_${Date.now()}.pdf`;
+
+  return protectPdfWithPassword({
+    inputPath: appPath,
+    outputPath: tempPath,
+    password,
+  });
+}
 
 export async function exportHistoryItemToDevice(
   item: HistoryItem,
@@ -150,7 +168,6 @@ export async function exportHistoryItemToDevice(
 
   const isRenaming = !!options?.exportBaseName;
 
-  // ✅ Se já foi exportado e o usuário NÃO pediu renomear, não exporta de novo.
   if (item.exportedPath && !isRenaming) {
     return {
       exportedPath: item.exportedPath,
@@ -170,7 +187,6 @@ export async function exportHistoryItemToDevice(
         );
         return { exportedPath, message: t('export.jpegExported') };
       } catch (error) {
-        // Se o usuário escolheu nome (rename), não mexe no nome: manda ele trocar.
         if (isRenaming) {
           if (isNameConflictError(error)) {
             throw new Error(t('export.nameAlreadyExists'));
@@ -182,7 +198,6 @@ export async function exportHistoryItemToDevice(
           throw error;
         }
 
-        // Se foi clique normal, tenta com sufixo pra evitar conflito.
         const fallbackName = addUniqueSuffix(displayName);
         const exportedPath = await exportImageAndroid29Plus(
           item.savedInAppPath,
@@ -209,43 +224,54 @@ export async function exportHistoryItemToDevice(
   const displayName = ensureExtension(baseName || baseFromHistory, '.pdf');
   if (!displayName) throw new Error(t('export.invalidName'));
 
-  if (Platform.OS === 'android' && apiLevel >= 29) {
-    try {
-      const exportedPath = await exportPdfAndroid29Plus(
+  const password = options?.pdfPassword?.trim();
+  let sourcePath = item.savedInAppPath;
+  let tempProtectedPath: string | undefined;
+
+  try {
+    if (password) {
+      tempProtectedPath = await createProtectedPdfForExport(
         item.savedInAppPath,
         displayName,
+        password,
       );
-      return { exportedPath, message: t('export.pdfExported') };
-    } catch (error) {
-      if (isRenaming) {
-        if (isNameConflictError(error)) {
-          throw new Error(t('export.nameAlreadyExists'));
+      sourcePath = tempProtectedPath;
+    }
+
+    if (Platform.OS === 'android' && apiLevel >= 29) {
+      try {
+        const exportedPath = await exportPdfAndroid29Plus(sourcePath, displayName);
+        return { exportedPath, message: t('export.pdfExported') };
+      } catch (error) {
+        if (isRenaming) {
+          if (isNameConflictError(error)) {
+            throw new Error(t('export.nameAlreadyExists'));
+          }
+          throw error;
         }
-        throw error;
-      }
 
-      if (!isNameConflictError(error)) {
-        throw error;
-      }
+        if (!isNameConflictError(error)) {
+          throw error;
+        }
 
-      const fallbackName = addUniqueSuffix(displayName);
-      const exportedPath = await exportPdfAndroid29Plus(
-        item.savedInAppPath,
-        fallbackName,
-      );
-      return { exportedPath, message: t('export.pdfExported') };
+        const fallbackName = addUniqueSuffix(displayName);
+        const exportedPath = await exportPdfAndroid29Plus(sourcePath, fallbackName);
+        return { exportedPath, message: t('export.pdfExported') };
+      }
+    }
+
+    const allowed = await ensureLegacyWritePermission();
+    if (!allowed) throw new Error(t('export.permissionDeniedDownloads'));
+
+    const exportedPath = await exportPdfLegacy(sourcePath, displayName, isRenaming);
+    if (exportedPath) return { exportedPath, message: t('export.pdfExported') };
+
+    return { exportedPath: undefined, message: t('export.pdfSavedOnly') };
+  } finally {
+    if (tempProtectedPath) {
+      await RNFS.unlink(tempProtectedPath).catch(() => {
+        // ignore cleanup failure
+      });
     }
   }
-
-  const allowed = await ensureLegacyWritePermission();
-  if (!allowed) throw new Error(t('export.permissionDeniedDownloads'));
-
-  const exportedPath = await exportPdfLegacy(
-    item.savedInAppPath,
-    displayName,
-    isRenaming,
-  );
-  if (exportedPath) return { exportedPath, message: t('export.pdfExported') };
-
-  return { exportedPath: undefined, message: t('export.pdfSavedOnly') };
 }

@@ -29,6 +29,7 @@ import { HistoryItem } from '../../features/history/historyTypes';
 import { RenameFileModal } from '../../components/RenameFileModal';
 import { ConfirmDeleteModal } from '../../components/ConfirmDeleteModal';
 import { MergeProgressOverlay } from '../../components/MergeProgressOverlay';
+import { PdfPasswordModal } from '../../components/PdfPasswordModal';
 
 export function HomeScreen({ navigation }: any) {
   const insets = useSafeAreaInsets();
@@ -42,6 +43,7 @@ export function HomeScreen({ navigation }: any) {
     share,
     duplicate,
     remove,
+    protectPdfItem,
   } = useHistory();
 
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -56,6 +58,8 @@ export function HomeScreen({ navigation }: any) {
   const [isActionMenuVisible, setIsActionMenuVisible] = useState(false);
   const [isRenameVisible, setIsRenameVisible] = useState(false);
   const [isDeleteVisible, setIsDeleteVisible] = useState(false);
+  const [isPasswordModalVisible, setIsPasswordModalVisible] = useState(false);
+  const [passwordModalMode, setPasswordModalMode] = useState<'export' | 'protect'>('protect');
 
   const handleStartScan = () => navigation.navigate('Scan');
 
@@ -191,6 +195,14 @@ export function HomeScreen({ navigation }: any) {
 
   const handleExport = useCallback(() => {
     if (!activeItem) return;
+
+    if (activeItem.format === 'PDF') {
+      closeActionMenu();
+      setPasswordModalMode('export');
+      setIsPasswordModalVisible(true);
+      return;
+    }
+
     runItemAction(async () => {
       const result = await exportToDevice(activeItem);
       Alert.alert(
@@ -198,7 +210,7 @@ export function HomeScreen({ navigation }: any) {
         result.message || t('history.exportFail'),
       );
     });
-  }, [activeItem, exportToDevice, runItemAction]);
+  }, [activeItem, closeActionMenu, exportToDevice, runItemAction]);
 
   const handleShare = useCallback(() => {
     if (!activeItem) return;
@@ -214,6 +226,56 @@ export function HomeScreen({ navigation }: any) {
       Alert.alert(t('common.success'), t('history.duplicateSuccess'));
     });
   }, [activeItem, duplicate, runItemAction]);
+
+
+  const handleProtectWithPassword = useCallback(() => {
+    if (!activeItem || activeItem.format !== 'PDF') return;
+    closeActionMenu();
+    setPasswordModalMode('protect');
+    setIsPasswordModalVisible(true);
+  }, [activeItem, closeActionMenu]);
+
+  const handlePasswordConfirm = useCallback(
+    async ({
+      shouldProtect,
+      password,
+    }: {
+      shouldProtect: boolean;
+      password: string;
+      confirmPassword: string;
+    }) => {
+      if (!activeItem) return;
+
+      setIsPasswordModalVisible(false);
+
+      try {
+        if (passwordModalMode === 'export') {
+          const result = await exportToDevice(
+            activeItem,
+            undefined,
+            shouldProtect ? password : undefined,
+          );
+
+          Alert.alert(
+            t('common.success'),
+            result.message || t('history.exportFail'),
+          );
+          return;
+        }
+
+        if (!shouldProtect) return;
+
+        await protectPdfItem(activeItem, password);
+        Alert.alert(t('common.success'), t('pdfProtection.protectSuccess'));
+      } catch (error: any) {
+        Alert.alert(
+          t('common.error'),
+          error?.message || t('preview.modalSaveErrorFallback'),
+        );
+      }
+    },
+    [activeItem, exportToDevice, passwordModalMode, protectPdfItem],
+  );
 
   const openRename = useCallback(() => {
     closeActionMenu();
@@ -377,6 +439,16 @@ export function HomeScreen({ navigation }: any) {
                 {t('history.duplicateAction')}
               </Text>
             </Pressable>
+            {activeItem?.format === 'PDF' ? (
+              <Pressable
+                style={styles.actionMenuItem}
+                onPress={handleProtectWithPassword}
+              >
+                <Text style={styles.actionMenuText}>
+                  {t('history.protectAction')}
+                </Text>
+              </Pressable>
+            ) : null}
             <Pressable
               style={styles.actionMenuItem}
               onPress={openDeleteConfirm}
@@ -394,6 +466,23 @@ export function HomeScreen({ navigation }: any) {
         initialValue={activeBaseName}
         onCancel={() => setIsRenameVisible(false)}
         onConfirm={handleRenameConfirm}
+      />
+
+      <PdfPasswordModal
+        visible={isPasswordModalVisible}
+        title={
+          passwordModalMode === 'export'
+            ? t('pdfProtection.exportTitle')
+            : t('pdfProtection.protectTitle')
+        }
+        allowSkipProtection={passwordModalMode === 'export'}
+        confirmLabel={
+          passwordModalMode === 'export'
+            ? t('history.exportAction')
+            : t('history.protectAction')
+        }
+        onCancel={() => setIsPasswordModalVisible(false)}
+        onConfirm={handlePasswordConfirm}
       />
 
       <ConfirmDeleteModal
