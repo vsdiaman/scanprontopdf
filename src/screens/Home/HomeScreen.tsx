@@ -28,6 +28,7 @@ import { Loading } from '../../components/Loading';
 import { HistoryItem } from '../../features/history/historyTypes';
 import { RenameFileModal } from '../../components/RenameFileModal';
 import { ConfirmDeleteModal } from '../../components/ConfirmDeleteModal';
+import { MergeProgressOverlay } from '../../components/MergeProgressOverlay';
 
 export function HomeScreen({ navigation }: any) {
   const insets = useSafeAreaInsets();
@@ -44,8 +45,12 @@ export function HomeScreen({ navigation }: any) {
   } = useHistory();
 
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [isSelectionEnabled, setIsSelectionEnabled] = useState(false);
+  const [isMergeMode, setIsMergeMode] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
+  const [isMerging, setIsMerging] = useState(false);
+  const [mergeProgress, setMergeProgress] = useState(0);
+  const [mergeStatusText, setMergeStatusText] = useState('');
+  const [mergeSuccessVisible, setMergeSuccessVisible] = useState(false);
 
   const [activeItem, setActiveItem] = useState<HistoryItem | null>(null);
   const [isActionMenuVisible, setIsActionMenuVisible] = useState(false);
@@ -107,17 +112,44 @@ export function HomeScreen({ navigation }: any) {
   }, [isImporting, refresh]);
 
   const handleMergeSelection = async () => {
+    if (!isMergeMode) {
+      setIsMergeMode(true);
+      return;
+    }
+
+    if (isMerging) return;
+
     const selectedItems = items.filter(item => selectedIds.includes(item.id));
     if (selectedItems.length < 2) return;
 
     try {
+      setIsMerging(true);
+      setMergeSuccessVisible(false);
+      setMergeProgress(0);
+      setMergeStatusText(t('history.mergeProgressPreparing'));
       const mergedFileName = `Merged_${Date.now()}`;
-      const result = await mergePdfsAndExport(selectedItems, mergedFileName);
+      const result = await mergePdfsAndExport(
+        selectedItems,
+        mergedFileName,
+        (progress, status) => {
+          setMergeProgress(progress);
+          setMergeStatusText(status);
+        },
+      );
+      setMergeProgress(100);
+      setMergeStatusText(t('history.mergeProgressDone'));
+      setMergeSuccessVisible(true);
+      await new Promise(resolve => setTimeout(resolve, 650));
       setSelectedIds([]);
-      setIsSelectionEnabled(false);
+      setIsMergeMode(false);
       Alert.alert(t('common.success'), result.message || t('history.mergedSuccessAlert'));
     } catch (err: any) {
       Alert.alert(t('common.error'), err.message);
+    } finally {
+      setIsMerging(false);
+      setMergeSuccessVisible(false);
+      setMergeStatusText('');
+      setMergeProgress(0);
     }
   };
 
@@ -249,23 +281,25 @@ export function HomeScreen({ navigation }: any) {
           <TouchableOpacity
             style={[
               styles.mergeButton,
-              selectedIds.length < 2 && styles.buttonDisabled,
+              ((!isMergeMode || selectedIds.length < 2) || isMerging) && styles.buttonDisabled,
             ]}
             onPress={handleMergeSelection}
-            disabled={selectedIds.length < 2}
+            disabled={isMerging}
           >
             <Icon
               name="set-merge"
               size={24}
-              color={selectedIds.length < 2 ? '#94A3B8' : '#1E293B'}
+              color={!isMergeMode || selectedIds.length < 2 || isMerging ? '#94A3B8' : '#1E293B'}
             />
             <Text
               style={[
                 styles.buttonText,
-                selectedIds.length < 2 && { color: '#94A3B8' },
+                (!isMergeMode || selectedIds.length < 2 || isMerging) && { color: '#94A3B8' },
               ]}
             >
-              {t('home.mergeButton', { count: selectedIds.length })}
+              {isMergeMode
+                ? t('home.mergeButton', { count: selectedIds.length })
+                : t('home.mergeEnterSelection')}
             </Text>
           </TouchableOpacity>
         </View>
@@ -276,10 +310,17 @@ export function HomeScreen({ navigation }: any) {
           onOpenActions={openActionMenu}
           externalSelectedIds={selectedIds}
           onSelectionChange={setSelectedIds}
-          isSelectionEnabled={isSelectionEnabled}
-          onToggleSelectionMode={setIsSelectionEnabled}
+          isMergeMode={isMergeMode}
+          onMergeModeChange={setIsMergeMode}
         />
       </ScrollView>
+
+      <MergeProgressOverlay
+        visible={isMerging}
+        progress={mergeProgress}
+        statusText={mergeStatusText}
+        isSuccess={mergeSuccessVisible}
+      />
 
       <Modal
         visible={isActionMenuVisible}

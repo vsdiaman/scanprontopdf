@@ -185,7 +185,15 @@ export function useHistory() {
   );
 
   const mergePdfsAndExport = useCallback(
-    async (pdfItems: HistoryItem[], outputBaseName: string) => {
+    async (
+      pdfItems: HistoryItem[],
+      outputBaseName: string,
+      onProgress?: (progress: number, status: string) => void,
+    ) => {
+      const notifyProgress = (progress: number, status: string) => {
+        onProgress?.(Math.max(0, Math.min(100, Math.round(progress))), status);
+      };
+
       if (pdfItems.length < 2) {
         throw new Error(t('history.mergeNeedAtLeastTwo'));
       }
@@ -193,10 +201,12 @@ export function useHistory() {
       if (hasNonPdf) {
         throw new Error(t('history.mergePdfOnly'));
       }
+      notifyProgress(3, t('history.mergeProgressValidating'));
 
       const { baseName, mergedPdfPath } = await mergePdfFilesToAppFolder({
         inputPdfPaths: pdfItems.map(i => i.savedInAppPath),
         outputBaseName,
+        onProgress: notifyProgress,
       });
 
       const fileName = `${baseName}.pdf`;
@@ -212,6 +222,7 @@ export function useHistory() {
       const exportResult = await exportHistoryItemToDevice(tempItem, {
         exportBaseName: baseName,
       });
+      notifyProgress(95, t('history.mergeProgressFinalizing'));
 
       await addHistoryItem({
         fileName,
@@ -221,6 +232,7 @@ export function useHistory() {
       });
 
       await refresh();
+      notifyProgress(100, t('history.mergeProgressDone'));
 
       const message = exportResult.exportedPath
         ? t('history.mergedExported')
