@@ -28,6 +28,7 @@ import {
 import { addHistoryItem } from '../../features/history/historyRepository';
 import { t } from '../../i18n';
 import { generateDefaultFileId } from '../../utils/generateDefaultFileId';
+import { PdfPasswordModal } from '../../components/PdfPasswordModal';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Preview'>;
 
@@ -51,6 +52,7 @@ export function PreviewScreen({ navigation, route }: Props) {
   const [shouldGoHomeAfterOk, setShouldGoHomeAfterOk] = useState(false);
   const isMountedRef = useRef(true);
   const isSavingRef = useRef(false);
+  const [isPasswordModalVisible, setIsPasswordModalVisible] = useState(false);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -127,7 +129,7 @@ export function PreviewScreen({ navigation, route }: Props) {
     return true;
   };
 
-  const onSave = async () => {
+  const performSave = async (pdfPassword?: string) => {
     if (isSavingRef.current || isSaving) return;
 
     const pages = (imageUris?.length ? imageUris : [imageUri]).filter(Boolean);
@@ -153,6 +155,7 @@ export function PreviewScreen({ navigation, route }: Props) {
         imageUris: pages,
         fileName: safeBaseName,
         format: saveFormat,
+        pdfPassword,
       });
 
       await addHistoryItem({
@@ -183,6 +186,14 @@ export function PreviewScreen({ navigation, route }: Props) {
     }
   };
 
+  const onSave = async () => {
+    if (saveFormat === 'PDF') {
+      setIsPasswordModalVisible(true);
+      return;
+    }
+
+    await performSave();
+  };
   return (
     <View style={styles.container}>
       <AppHeader
@@ -254,6 +265,18 @@ export function PreviewScreen({ navigation, route }: Props) {
           </Card>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <PdfPasswordModal
+        visible={isPasswordModalVisible}
+        title={t('pdfProtection.exportTitle')}
+        allowSkipProtection
+        confirmLabel={t('common.save')}
+        onCancel={() => setIsPasswordModalVisible(false)}
+        onConfirm={({ shouldProtect, password }) => {
+          setIsPasswordModalVisible(false);
+          performSave(shouldProtect ? password : undefined);
+        }}
+      />
 
       <InfoModal
         visible={isModalVisible}

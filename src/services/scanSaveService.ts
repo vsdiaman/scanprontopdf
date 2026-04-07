@@ -6,6 +6,7 @@ import { PDFDocument } from 'pdf-lib';
 import { Buffer } from 'buffer';
 import { t } from '../i18n';
 import { generateDefaultFileId } from '../utils/generateDefaultFileId';
+import { protectPdfWithPassword } from '../features/history/pdfPasswordService';
 
 export type SaveFormat = 'PDF' | 'JPEG';
 
@@ -16,6 +17,7 @@ type SaveInput = {
   imageUri?: string;
   imageUris?: string[];
   pdfUri?: string;
+  pdfPassword?: string;
 };
 
 type SaveResult = {
@@ -285,6 +287,17 @@ async function exportPdfToDownloads(appPdfPath: string, safeName: string) {
   }
 }
 
+
+async function createProtectedPdfForExport(appPdfPath: string, safeName: string, password: string) {
+  const protectedPath = `${RNFS.CachesDirectoryPath}/${safeName}_protected_${Date.now()}.pdf`;
+
+  return protectPdfWithPassword({
+    inputPath: appPdfPath,
+    outputPath: protectedPath,
+    password,
+  });
+}
+
 export async function saveScanAndExport(input: SaveInput): Promise<SaveResult> {
   const { fileName, format, pdfUri } = input;
 
@@ -319,8 +332,30 @@ export async function saveScanAndExport(input: SaveInput): Promise<SaveResult> {
       savedInAppPath = await buildPdfFromImagesToAppFolder(imageUris, safeName);
     }
 
-    const exportedPath = await exportPdfToDownloads(savedInAppPath, safeName);
-    return { savedInAppPath, exportedPath };
+    const password = input.pdfPassword?.trim();
+    let tempProtectedPath: string | undefined;
+
+    try {
+      if (password) {
+        tempProtectedPath = await createProtectedPdfForExport(
+          savedInAppPath,
+          safeName,
+          password,
+        );
+      }
+
+      const exportedPath = await exportPdfToDownloads(
+        tempProtectedPath || savedInAppPath,
+        safeName,
+      );
+      return { savedInAppPath, exportedPath };
+    } finally {
+      if (tempProtectedPath) {
+        await RNFS.unlink(tempProtectedPath).catch(() => {
+          // ignore cleanup failure
+        });
+      }
+    }
   } catch (error) {
     console.error('[scanSaveService] saveScanAndExport failed', {
       format,

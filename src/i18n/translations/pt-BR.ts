@@ -124,6 +124,7 @@ export default {
     shareAction: 'Compartilhar',
     exportAction: 'Exportar / Salvar no dispositivo',
     duplicateAction: 'Duplicar',
+    protectAction: 'Proteger com senha',
     deleteAction: 'Excluir',
     duplicateSuccess: 'Arquivo duplicado com sucesso.',
     duplicateFailed: 'Não foi possível duplicar o arquivo.',
@@ -161,5 +162,23 @@ export default {
     pdfSavedAndExported: 'PDF salvo no app e salvo em Downloads.',
     pdfSavedOnly:
       'PDF salvo no app. (Falhou exportar para Downloads neste aparelho.)',
+  },
+
+  pdfProtection: {
+    exportTitle: 'Exportar PDF',
+    protectTitle: 'Proteger PDF com senha',
+    enableToggle: 'Proteger com senha',
+    passwordPlaceholder: 'Senha',
+    confirmPlaceholder: 'Confirmar senha',
+    passwordHint: 'A senha deve ter pelo menos %{min} caracteres.',
+    disabledHint: 'Sem proteção por senha, o fluxo de exportação segue normal.',
+    passwordRequired: 'Senha obrigatória.',
+    confirmRequired: 'Confirmação da senha obrigatória.',
+    passwordMismatch: 'As senhas não coincidem.',
+    passwordMinLength: 'A senha deve ter no mínimo %{min} caracteres.',
+    notSupportedOnDevice: 'Proteção por senha indisponível neste dispositivo.',
+    failedToCreate: 'Falha ao criar PDF protegido.',
+    protectSuccess: 'Cópia protegida criada com sucesso.',
+    onlyPdfSupported: 'A proteção por senha está disponível apenas para PDF.',
   },
 };

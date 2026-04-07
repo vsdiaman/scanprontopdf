@@ -11,6 +11,7 @@ import {
 import { exportHistoryItemToDevice } from './exportHistoryItem';
 import { mergePdfFilesToAppFolder } from './mergePdfService';
 import { t } from '../../i18n';
+import { protectPdfWithPassword } from './pdfPasswordService';
 
 function stripFileScheme(path: string) {
   return path.startsWith('file://') ? path.replace('file://', '') : path;
@@ -61,6 +62,12 @@ async function buildUniquePath(
   }
 
   throw new Error(t('history.duplicateFailed'));
+}
+
+
+function buildProtectedBaseName(fileName: string) {
+  const { base } = splitFileName(fileName);
+  return `${base}_protected`;
 }
 
 export function useHistory() {
@@ -171,8 +178,11 @@ export function useHistory() {
   );
 
   const exportToDevice = useCallback(
-    async (item: HistoryItem, exportBaseName?: string) => {
-      const result = await exportHistoryItemToDevice(item, { exportBaseName });
+    async (item: HistoryItem, exportBaseName?: string, pdfPassword?: string) => {
+      const result = await exportHistoryItemToDevice(item, {
+        exportBaseName,
+        pdfPassword,
+      });
 
       if (result.exportedPath) {
         await updateHistoryItem(item.id, { exportedPath: result.exportedPath });
@@ -180,6 +190,40 @@ export function useHistory() {
       }
 
       return result;
+    },
+    [refresh],
+  );
+
+  const protectPdfItem = useCallback(
+    async (item: HistoryItem, password: string) => {
+      if (item.format !== 'PDF') {
+        throw new Error(t('pdfProtection.onlyPdfSupported'));
+      }
+
+      const appPath = stripFileScheme(item.savedInAppPath);
+      const exists = await RNFS.exists(appPath);
+      if (!exists) {
+        throw new Error(t('export.fileMissing'));
+      }
+
+      const folderPath = appPath.slice(0, appPath.lastIndexOf('/'));
+      const protectedBaseName = buildProtectedBaseName(item.fileName);
+      const unique = await buildUniquePath(folderPath, protectedBaseName, '.pdf');
+
+      await protectPdfWithPassword({
+        inputPath: appPath,
+        outputPath: unique.fullPath,
+        password,
+      });
+
+      const created = await addHistoryItem({
+        fileName: unique.fileName,
+        format: 'PDF',
+        savedInAppPath: unique.fullPath,
+      });
+
+      await refresh();
+      return created;
     },
     [refresh],
   );
@@ -256,6 +300,7 @@ export function useHistory() {
     share,
     duplicate,
     exportToDevice,
+    protectPdfItem,
     mergePdfsAndExport,
   };
 }
