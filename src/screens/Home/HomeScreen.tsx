@@ -34,6 +34,7 @@ import {
   loadInterstitial,
   tryShowInterstitialAndContinue,
 } from '../../ads/interstitial';
+import { openStoreReviewPage, requestAppReview } from '../../services/appReview';
 
 export function HomeScreen({ navigation }: any) {
   const insets = useSafeAreaInsets();
@@ -81,6 +82,13 @@ export function HomeScreen({ navigation }: any) {
       navigation.navigate('Scan');
     });
   }, [navigation]);
+
+  const handleReviewAppPress = useCallback(async () => {
+    const requestedNativeReview = await requestAppReview();
+    if (!requestedNativeReview) {
+      await openStoreReviewPage();
+    }
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
@@ -347,6 +355,8 @@ export function HomeScreen({ navigation }: any) {
         <AppHeader
           title={t('home.headerTitle')}
           subtitle={t('home.headerSubtitle')}
+          rightActionLabel={t('home.reviewAppAction')}
+          onRightActionPress={handleReviewAppPress}
         />
       </View>
 

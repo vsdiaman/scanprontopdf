@@ -26,6 +26,10 @@ import {
   saveScanAndExport,
 } from '../../../services/scanSaveService';
 import { generateDefaultFileId } from '../../../utils/generateDefaultFileId';
+import {
+  incrementSuccessfulActionCount,
+  maybeAskForReview,
+} from '../../../services/appReview';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Preview'>;
 
@@ -130,15 +134,26 @@ export function PreviewScreen({ navigation, route }: Props) {
         exportedPath,
       });
 
+      await incrementSuccessfulActionCount();
+
       Alert.alert(
         'Salvo',
         `${buildSaveSuccessMessage(
           saveFormat,
           exportedPath,
         )}\n\nApp: ${savedInAppPath}`,
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              maybeAskForReview().catch(() => {
+                // silent fail
+              });
+              navigation.popToTop();
+            },
+          },
+        ],
       );
-
-      navigation.popToTop();
     } catch (error) {
       Alert.alert(error instanceof Error ? error.message : 'Erro ao salvar.');
     } finally {
