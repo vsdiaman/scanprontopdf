@@ -40,6 +40,7 @@ export default {
     scanButton: 'Escanear',
     mergeButton: 'Combinar (%{count})',
     mergeEnterSelection: 'Seleccionar PDFs',
+    reviewAppAction: 'Valorar app',
     importedDefaultName: 'Importado',
     importedDefaultFileName: 'documento.pdf',
     importErrorLog: 'Error al importar PDF:',
